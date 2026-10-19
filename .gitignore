@@ -1,0 +1,16 @@
+node_modules/
+.DS_Store
+*.log
+dist/
+.env
+eval/models/
+
+# 运行时数据目录：内容不进库；内置资产（分身定义 / 市场清单）例外
+runtime/data/*
+!runtime/data/agents/
+!runtime/data/market-seed.json
+
+# 打包产物 / electron 下载缓存
+runtime/build/
+runtime/dist/
+runtime/.electron-dl/

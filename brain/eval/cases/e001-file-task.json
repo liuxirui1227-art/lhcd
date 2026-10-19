@@ -1,0 +1,21 @@
+{
+  "id": "e001",
+  "name": "代码：读取→修改→运行→汇总（最小任务全链路）",
+  "setup": { "files": { "a.txt": "Hello\n" } },
+  "sessions": [
+    {
+      "task": "读取 a.txt，把内容改为 HelloWorld 写入 b.txt，然后 cat b.txt 确认",
+      "script": [
+        { "calls": [{ "id": "c1", "name": "read", "args": { "path": "a.txt" } }] },
+        { "calls": [{ "id": "c2", "name": "write", "args": { "path": "b.txt", "content": "HelloWorld" } }] },
+        { "calls": [{ "id": "c3", "name": "bash", "args": { "command": "cat b.txt" } }] },
+        { "text": "完成：b.txt 内容为 HelloWorld" }
+      ]
+    }
+  ],
+  "checks": [
+    { "type": "output-contains", "contains": "HelloWorld" },
+    { "type": "file-content", "path": "b.txt", "contains": "HelloWorld" },
+    { "type": "cost-under", "limit": 0.01 }
+  ]
+}

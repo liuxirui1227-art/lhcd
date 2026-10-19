@@ -1,0 +1,20 @@
+{
+  "id": "e014",
+  "name": "产物登记：她写出一个文件 → 事件流里有 artifact.created（且类型认得出来）",
+  "setup": {},
+  "sessions": [
+    {
+      "task": "写一份汇报稿",
+      "script": [
+        { "calls": [{ "id": "c1", "name": "write", "args": { "path": "汇报稿.md", "content": "# 汇报\n三处已对齐" } }] },
+        { "text": "写好了" }
+      ]
+    }
+  ],
+  "checks": [
+    { "type": "event-contains", "event": "artifact.created" },
+    { "type": "event-field", "event": "artifact.created", "path": "kind", "equals": "text" },
+    { "type": "event-field", "event": "artifact.created", "path": "createdBy", "equals": "write" },
+    { "type": "file-content", "path": "汇报稿.md", "contains": "三处已对齐" }
+  ]
+}

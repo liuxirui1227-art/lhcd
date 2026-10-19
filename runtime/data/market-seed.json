@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "name": "开源技能精选",
+  "updatedAt": "2026-09-26",
+  "note": "第三方内容，未审核。这里只是『指路』：每一项都指向 GitHub 上的仓库，装之前请自己看一眼原文与授权。",
+  "items": [
+    {
+      "kind": "skill",
+      "name": "pdf",
+      "url": "https://raw.githubusercontent.com/anthropics/skills/main/skills/pdf/SKILL.md",
+      "repo": "anthropics/skills",
+      "summary": "处理 PDF：读文字与表格、合并拆分、旋转、加水印、填表单、加密解密、抽图、扫描件 OCR。",
+      "license": "专有（仅源码可见，用前读 LICENSE.txt）"
+    },
+    {
+      "kind": "skill",
+      "name": "docx",
+      "url": "https://raw.githubusercontent.com/anthropics/skills/main/skills/docx/SKILL.md",
+      "repo": "anthropics/skills",
+      "summary": "处理 Word 文档：读写编辑、目录/页眉页脚/页码、插图、查找替换、批注与修订。",
+      "license": "专有（仅源码可见，用前读 LICENSE.txt）"
+    },
+    {
+      "kind": "skill",
+      "name": "xlsx",
+      "url": "https://raw.githubusercontent.com/anthropics/skills/main/skills/xlsx/SKILL.md",
+      "repo": "anthropics/skills",
+      "summary": "处理表格：读写 xlsx/csv、加列、算公式、格式与图表，以及把乱表整理成规范表。",
+      "license": "专有（仅源码可见，用前读 LICENSE.txt）"
+    },
+    {
+      "kind": "skill",
+      "name": "pptx",
+      "url": "https://raw.githubusercontent.com/anthropics/skills/main/skills/pptx/SKILL.md",
+      "repo": "anthropics/skills",
+      "summary": "处理演示文稿：新建/读取/修改 pptx、拆分合并、按模板改版式、写备注。",
+      "license": "专有（仅源码可见，用前读 LICENSE.txt）"
+    },
+    {
+      "kind": "skill",
+      "name": "skill-creator",
+      "url": "https://raw.githubusercontent.com/anthropics/skills/main/skills/skill-creator/SKILL.md",
+      "repo": "anthropics/skills",
+      "summary": "教她怎么写出一个好本事：新建技能、改现有技能、衡量效果。",
+      "license": "未标授权（自己判断能不能用）"
+    },
+    {
+      "kind": "skill",
+      "name": "doc-coauthoring",
+      "url": "https://raw.githubusercontent.com/anthropics/skills/main/skills/doc-coauthoring/SKILL.md",
+      "repo": "anthropics/skills",
+      "summary": "陪你写文档的一套流程：先对齐结构，再分段打磨，最后统一口径。",
+      "license": "未标授权（自己判断能不能用）"
+    }
+  ]
+}

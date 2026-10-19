@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title data-i18n="stage.page.1">出镜模式 · 灵核</title>
+  <link rel="stylesheet" href="./overlay-tokens.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    html, body { height: 100%; background: transparent; overflow: hidden; font-family: -apple-system, "PingFang SC", sans-serif; }
+    /* 背景必须挂在实体元素上：透明窗不绘制 body 根背景（背景传播到根后随透明合成丢弃） */
+    #stage.solid-green { background: var(--stage-green); }
+    #stage.solid-grad { background: linear-gradient(160deg, var(--stage-grad-1) 0%, var(--stage-grad-2) 55%, var(--stage-grad-3) 100%); }
+    #stage { height: 100%; width: 100%; display: flex; align-items: flex-end; justify-content: center; position: relative; }
+    #gl { width: 100%; height: 100%; }
+    /* 控制条：默认悬浮半透明，鼠标离开窗口自动收起（出镜采集时干净画面） */
+    #bar {
+      position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%);
+      display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; max-width: 96%;
+      background: var(--stage-night-88); border: 1px solid var(--pri-a40);
+      border-radius: 14px; padding: 8px; transition: opacity .25s;
+    }
+    body.hide-bar #bar { opacity: 0; pointer-events: none; }
+    .btn {
+      font-size: 12.5px; color: var(--on-glass-1); background: var(--pri-a22b);
+      border: none; border-radius: 9px; padding: 7px 11px; cursor: pointer; white-space: nowrap;
+    }
+    .btn:hover { background: var(--pri-a45); }
+    .btn.on { background: var(--violet); color: var(--white); }
+    /* 键盘焦点可见：本页不引 ui.css，先就地声明；接入 ui.css 后删掉这条 */
+    :focus-visible { outline: 2px solid var(--violet); outline-offset: 2px; border-radius: 9px; }
+    .sep { width: 1px; background: var(--w-15); margin: 2px 4px; }
+    #tip {
+      position: absolute; left: 50%; top: 12px; transform: translateX(-50%);
+      font-size: 12.5px; color: var(--w-85); background: var(--stage-night-72);
+      padding: 6px 12px; border-radius: 10px; transition: opacity .25s; pointer-events: none;
+    }
+    body.hide-bar #tip { opacity: 0; }
+    #err { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+      color: var(--err-soft); font-size: 12.5px; text-align: center; line-height: 1.8; }
+    /* 关闭入口：常驻半透明 ✕（采集画面干净优先，但保证任何时刻都能关掉） */
+    #closeX {
+      position: absolute; top: 10px; right: 10px; width: 30px; height: 30px;
+      border: none; border-radius: 50%; cursor: pointer; font-size: 15px; line-height: 1;
+      color: var(--white); background: var(--stage-night-55); border: 1px solid var(--pri-lite-a35);
+      opacity: 0.45; transition: opacity .2s;
+    }
+    #closeX:hover { opacity: 1; background: var(--stage-close); }
+    /* 命中区扩展：视觉尺寸不变，可点区域撑到 ≥40×40（::after 不算进元素 rect，量命中区要用 elementFromPoint） */
+    #closeX::after { content: ''; position: absolute; inset: -7px; }
+    .btn { position: relative; }
+    .btn::after { content: ''; position: absolute; inset: -6px -4px; }
+    /* 淡出关闭动画：透明度渐变 → IPC 真正关闭 */
+    body.closing { opacity: 0; transition: opacity .35s ease; }
+    body { transition: opacity .2s; }
+  </style>
+</head>
+<body>
+  <div id="stage">
+    <canvas id="gl"></canvas>
+    <button id="closeX" title="关闭出镜模式（Esc）" data-i18n-title="stage.closeX.1">✕</button>
+    <div id="tip" data-i18n="stage.tip.1">OBS / 腾讯会议选「窗口采集」指定此窗即可出镜 · ✕ / Esc 平滑关闭</div>
+    <div id="bar">
+      <button class="btn on" data-bg="transparent" data-i18n="stage.btn.1">透明底</button>
+      <button class="btn" data-bg="green" data-i18n="stage.btn.2">绿幕</button>
+      <button class="btn" data-bg="grad" data-i18n="stage.btn.3">渐变底</button>
+      <div class="sep"></div>
+      <span id="models"></span>
+      <div class="sep"></div>
+      <span id="exprs"></span>
+      <button class="btn" data-act="celebrate" data-i18n="stage.btn.4">🎉 庆祝</button>
+    </div>
+    <div id="err" hidden></div>
+  </div>
+
+  <script src="./i18n.js"></script>
+
+  <script src="./vendor/pixi.min.js"></script>
+  <script src="./vendor/live2dcubismcore.min.js"></script>
+  <script src="./vendor/pixi-live2d-display.min.js"></script>
+  <script src="./pet-live2d.js"></script>
+  <script>
+    const glCanvas = document.getElementById('gl');
+    const errEl = document.getElementById('err');
+    let l2d = null;
+    let models = [];
+    let activeId = null;
+
+    function resize() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      glCanvas.width = Math.round(innerWidth * dpr);
+      glCanvas.height = Math.round(innerHeight * dpr);
+      l2d?.resize(glCanvas.width, glCanvas.height);
+    }
+    window.addEventListener('resize', resize);
+
+    // 背景切换（透明 = 采集后叠加任何画面；绿幕 = 直播软件抠像；渐变 = 直接出镜）
+    // 挂在 #stage 上：透明窗不绘制 body 根背景
+    const stageEl = document.getElementById('stage');
+    document.querySelectorAll('[data-bg]').forEach((b) => {
+      b.addEventListener('click', () => {
+        document.querySelectorAll('[data-bg]').forEach((x) => x.classList.remove('on'));
+        b.classList.add('on');
+        stageEl.classList.remove('solid-green', 'solid-grad');
+        if (b.dataset.bg === 'green') stageEl.classList.add('solid-green');
+        if (b.dataset.bg === 'grad') stageEl.classList.add('solid-grad');
+      });
+    });
+
+    // 鼠标离开窗口 → 收起控制条与提示（采集画面干净）；回来再显示
+    document.addEventListener('mouseleave', () => document.body.classList.add('hide-bar'));
+    document.addEventListener('mouseenter', () => document.body.classList.remove('hide-bar'));
+
+    function renderModels() {
+      document.getElementById('models').innerHTML = models.length
+        ? models.map((m) => `<button class="btn${m.id === activeId ? ' on' : ''}" data-model="${m.id}">${m.label}</button>`).join('')
+        : '';
+    }
+    function renderExprs() {
+      const list = l2d?.expressions?.() ?? [];
+      const html = list.length
+        ? list.map((n, i) => `<button class="btn" data-expr="${n}">😀${i + 1}</button>`).join('')
+          + '<button class="btn" data-expr="!reset">🔄 自然</button>'
+        : '';
+      document.getElementById('exprs').innerHTML = html;
+    }
+    document.getElementById('models').addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-model]');
+      if (!b) return;
+      const r = await window.api.live2dSetModel(b.dataset.model);
+      if (!r.ok) return;
+      activeId = b.dataset.model;
+      loadActive();
+    });
+    document.getElementById('exprs').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-expr]');
+      if (!b) return;
+      const expr = b.dataset.expr;
+      // 重置按钮：清除表情锁定，恢复自然状态
+      if (expr === '!reset') {
+        document.querySelectorAll('#exprs .btn').forEach((x) => x.classList.remove('on'));
+        l2d?.clearExpression?.();
+        return;
+      }
+      // 切换激活态（点击同一表情再次点击 = 取消，恢复自然表情）
+      const wasActive = b.classList.contains('on');
+      document.querySelectorAll('#exprs .btn').forEach((x) => x.classList.remove('on'));
+      if (wasActive) {
+        l2d?.clearExpression?.();
+      } else {
+        b.classList.add('on');
+        const ok = l2d?.setExpression?.(expr);
+        if (!ok) b.classList.remove('on');
+      }
+    });
+    document.querySelector('[data-act="celebrate"]').addEventListener('click', () => l2d?.celebrate?.());
+
+    // 平滑关闭——淡出动画 → IPC 真正关窗；✕ 常驻 + Esc 兜底（出镜窗随时可关，无残留）
+    let closing = false;
+    function closeStage() {
+      if (closing) return;
+      closing = true;
+      window.__stageClosing = true; // 自检通道
+      document.body.classList.add('closing');
+      setTimeout(() => { window.api?.stageClose?.(); }, 360);
+    }
+    document.getElementById('closeX').addEventListener('click', closeStage);
+    window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeStage(); });
+
+    async function loadActive() {
+      const m = models.find((x) => x.id === activeId) ?? models[0];
+      if (!m) return;
+      activeId = m.id;
+      renderModels();
+      const ok = await new Promise((resolve) => {
+        l2d.loadModel('l2d://local/' + m.file, (loaded) => resolve(loaded));
+        setTimeout(() => resolve(false), 30000);
+      });
+      if (!ok) {
+        errEl.hidden = false;
+        errEl.textContent = DT('stage.js.tpl.1', '模型「{p1}」加载失败（{p2}）', { p1: m.label, p2: window.__l2dErr ?? '' });
+        return;
+      }
+      renderExprs();
+    }
+
+    (async () => {
+      try {
+        let waited = 0;
+        while (!window.PETL2D?.supported() && waited < 15000) {
+          await new Promise((r) => setTimeout(r, 100)); waited += 100;
+        }
+        if (!window.PETL2D?.supported()) throw new Error('Live2D 库未就绪（vendor 目录缺失？）');
+        const list = await window.api.live2dModels?.().catch(() => null);
+        models = list?.models ?? [];
+        activeId = list?.active ?? models[0]?.id ?? null;
+        if (!models.length) throw new Error('本地没有 Live2D 模型');
+        l2d = window.PETL2D.create(glCanvas);
+        window.__stageL2d = l2d; // 自检通道
+        resize();
+        await loadActive();
+      } catch (e) {
+        errEl.hidden = false;
+        errEl.textContent = '出镜模式初始化失败：' + (e?.message ?? e);
+      }
+    })();
+  </script>
+</body>
+</html>

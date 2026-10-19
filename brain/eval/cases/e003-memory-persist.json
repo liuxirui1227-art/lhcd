@@ -1,0 +1,26 @@
+{
+  "id": "e003",
+  "name": "记忆：会话 A remember → 会话 B recall 跨会话召回",
+  "sessions": [
+    {
+      "name": "A",
+      "task": "记住：用户喜欢蓝色",
+      "script": [
+        { "calls": [{ "id": "c1", "name": "remember", "args": { "scope": "global", "key": "user.color", "content": "用户喜欢蓝色" } }] },
+        { "text": "已记住" }
+      ]
+    },
+    {
+      "name": "B",
+      "task": "用户喜欢什么颜色？",
+      "script": [
+        { "calls": [{ "id": "c2", "name": "recall", "args": { "query": "喜欢" } }] },
+        { "text": "用户喜欢蓝色" }
+      ]
+    }
+  ],
+  "checks": [
+    { "type": "memory-persisted", "contains": "用户喜欢蓝色" },
+    { "type": "output-contains", "contains": "用户喜欢蓝色" }
+  ]
+}

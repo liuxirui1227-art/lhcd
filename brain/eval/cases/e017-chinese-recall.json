@@ -1,0 +1,20 @@
+{
+  "id": "e017",
+  "name": "中文召回：写一条中文记忆，用相关的中文说法能找回来（条 36 CJK 双字）",
+  "setup": {},
+  "sessions": [
+    {
+      "task": "记一下：下周三要交济易贷的月报，然后我想问问月报那件事",
+      "script": [
+        { "calls": [{ "id": "c1", "name": "remember", "args": { "scope": "global", "key": "work.report", "content": "下周三要交济易贷的月报" } }] },
+        { "calls": [{ "id": "c2", "name": "recall", "args": { "query": "济易贷月报什么时候交" } }] },
+        { "text": "想起来了" }
+      ]
+    }
+  ],
+  "checks": [
+    { "type": "tool-result-contains", "contains": "济易贷" },
+    { "type": "tool-result-contains", "contains": "月报" },
+    { "type": "memory-persisted", "contains": "济易贷" }
+  ]
+}

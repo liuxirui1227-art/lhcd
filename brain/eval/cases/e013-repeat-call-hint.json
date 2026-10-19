@@ -1,0 +1,21 @@
+{
+  "id": "e013",
+  "name": "原地打转：同工具同参数连调 → 系统回注提示（不静默死循环）",
+  "setup": { "files": { "a.txt": "内容" } },
+  "sessions": [
+    {
+      "task": "看看 a.txt",
+      "script": [
+        { "calls": [{ "id": "c1", "name": "read", "args": { "path": "a.txt" } }] },
+        { "calls": [{ "id": "c2", "name": "read", "args": { "path": "a.txt" } }] },
+        { "calls": [{ "id": "c3", "name": "read", "args": { "path": "a.txt" } }] },
+        { "text": "看过了" }
+      ]
+    }
+  ],
+  "checks": [
+    { "type": "request-contains", "contains": "你刚才的工具调用与之前重复" },
+    { "type": "tool-result-contains", "contains": "内容" },
+    { "type": "output-contains", "contains": "看过了" }
+  ]
+}

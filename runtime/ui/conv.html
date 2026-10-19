@@ -1,0 +1,740 @@
+<!doctype html>
+<!-- 对话房间(Conversation Room)——连续聊天时从 Quick「展开对话」进入。
+     空气感浮层:半透明/强模糊/22px 圆角/轻阴影/无明显窗口边框;标题=TA 名;流式+停止;历史仍归 Home。 -->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title data-i18n="conv.page.1">灵核 · 对话</title>
+<link rel="stylesheet" href="./ui.css">
+<style>
+  html, body { background: transparent; overflow: hidden; }
+  /* 这间房统一成**浅底深字**（深色主题下也跟着系统走）：此前是恒深色玻璃，家页相反是白纱。
+     对比度门槛：正文对背景 ≥4.5:1、次要 ≥3:1。 */
+  .room {
+    position: absolute; inset: 12px;
+    display: flex; flex-direction: column;
+    background-color: var(--chat-surface);      /* 单色底：对比度按它算（渐变只是味道） */
+    background-image: var(--chat-bg);
+    backdrop-filter: blur(26px) saturate(1.25); -webkit-backdrop-filter: blur(26px) saturate(1.25);
+    border: 1px solid var(--chat-line);
+    border-radius: 22px;
+    box-shadow: var(--shadow-pop), inset 0 1px 0 var(--w-60);
+    color: var(--txt-on-chat);
+    animation: roomIn var(--dur) var(--ease);
+    overflow: hidden;
+  }
+  @keyframes roomIn { from { opacity: 0; transform: translateY(8px) scale(.98); } }
+  .r-head {
+    display: flex; align-items: center; gap: 10px; padding: 14px 18px 10px;
+    -webkit-app-region: drag; cursor: default;
+  }
+  .r-head .who { font-size: 15px; letter-spacing: 1px; }
+  .r-head .sub { font-size: 11px; color: var(--txt-on-chat-2); letter-spacing: 1px; }
+  .r-head .clip {
+    margin-left: auto; -webkit-app-region: no-drag; cursor: pointer;
+    width: 26px; height: 26px; border-radius: 50%; border: none;
+    background: var(--pri-a10); color: var(--txt-on-chat-2); font-size: 12.5px;
+    transition: background var(--dur-fast);
+  }
+  .r-head .clip:hover { background: var(--pri-a22); color: var(--txt-on-chat); }
+  .r-head .x {
+    margin-left: 0; -webkit-app-region: no-drag; cursor: pointer;
+    width: 26px; height: 26px; border-radius: 50%; border: none;
+    background: var(--pri-a10); color: var(--txt-on-chat-2); font-size: 12.5px;
+    transition: background var(--dur-fast);
+  }
+  .r-head .x:hover { background: var(--pri-a22); color: var(--txt-on-chat); }
+  /* 拖文件进房间 → 高亮提示可松手 */
+  .room.dragover { border-color: var(--pri-a65); box-shadow: 0 0 0 2px var(--pri-a28b), var(--shadow-pop); }
+  /* 全铺：她的字直接铺在夜色上，只有你自己那条是小胶囊 */
+  .r-log { flex: 1; overflow-y: auto; padding: 10px 22px 12px; min-height: 0;
+    mask-image: linear-gradient(180deg, var(--black) 0%, var(--black) 90%, transparent 100%); }
+  .r-log .msg { margin: 10px 0; }
+  /* 回到这句重说——只挂在我的消息上，悬浮才露头 */
+  .msg.lookback-able .lookback { opacity: 0; transition: opacity .12s; }
+  .msg.lookback-able:hover .lookback, .msg.lookback-able:focus-within .lookback { opacity: 1; }
+  .lookback { display: inline-flex; align-items: center; gap: 4px; margin: 4px 2px 0 auto;
+    font: inherit; font-size: 11.5px; color: var(--ink2); background: none; border: 0;
+    padding: 2px 6px; border-radius: 999px; cursor: pointer; }
+  .lookback:hover { background: var(--row); color: var(--ink); }
+  #branch-bar { display: none; align-items: center; gap: 8px; margin: 0 0 8px;
+    padding: 6px 10px; border-radius: 10px; background: var(--row); font-size: 11.5px; color: var(--ink2); }
+  #branch-bar.on { display: flex; }
+  #branch-bar button { font: inherit; font-size: 11.5px; color: var(--accent); background: none;
+    border: 0; cursor: pointer; text-decoration: underline; padding: 0; }
+  .r-log .msg.ta .m-bubble { background: none; color: var(--txt-on-chat); box-shadow: none; padding: 2px 0; max-width: 100%; }
+  .r-log .msg .m-bubble { color: var(--txt-on-chat); box-shadow: none; }
+  .r-log .msg.me .m-bubble { background: var(--accent); color: var(--white); }
+  .r-log .msg.sys .m-bubble { color: var(--txt-on-chat-2); }
+  /* `.ui-pending` 原用 `--ink2`，压在**半透明深底**上——深色模式下几乎读不出来。
+     现在阅读面固定为浅底，这两行都用**对话面专用色**（对浅底 ≥5.2:1）。 */
+  .r-log .ui-pending, .r-log .ui-pending .pd-txt { color: var(--txt-on-chat-2); }
+  /* 系统提示卡也要跟着阅读面走：卡片自身用的是主题 Token（深色模式下是"白 7%"），
+     压在浅底上等于没有底色 —— 这里在对话面内改回浅底深字。 */
+  .r-log .syscard { background: var(--rose-a07); border-color: var(--rose-a30); color: var(--txt-on-chat); }
+  .r-log .syscard.note { background: var(--pri-a06); border-color: var(--chat-line); color: var(--txt-on-chat-2); }
+  .r-log .syscard .sc-t { color: inherit; }
+  .r-log .syscard .sc-ops button { color: var(--txt-on-chat-2); }
+  .r-log .syscard .sc-ops button:hover { background: var(--pri-a14b); color: var(--txt-on-chat); }
+  .r-log .m-av { background: var(--grad); }
+  .r-inp {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 10px 14px 14px;
+  }
+  .r-inp #queue-rows { flex-basis: 100%; order: -1; display: none; flex-direction: column; gap: 4px; }
+  /* 待发出的文件芯片，与家页同一套（UI2.FileChipRow）。
+     整行 + order:-1 → 落在输入框上方，和队列行同款；空时 display:none 不占位。 */
+  .r-inp #file-chips { flex-basis: 100%; order: -1; display: none; flex-wrap: wrap; gap: 8px; }
+  .r-inp #queue-rows .q-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--txt-on-chat-2); }
+  .r-inp #queue-rows .q-row button { flex: none; background: none; border: 1px solid var(--chat-line); color: var(--txt-on-chat-2);
+    border-radius: 8px; padding: 2px 8px; font-size: 11px; cursor: pointer; }
+  .r-inp #mode-chip { flex: none; background: none; border: 1px solid var(--pri-a45b); color: var(--accent);
+    border-radius: 10px; padding: 6px 10px; font-size: 12.5px; cursor: pointer; display: none; }
+  .r-inp input {
+    flex: 1; min-width: 0; height: 44px; border-radius: 14px; border: 1px solid var(--chat-line);
+    background: var(--white); color: var(--txt-on-chat); font-size: 12.5px; padding: 0 16px; outline: none;
+    transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+  }
+  .r-inp input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .r-inp input::placeholder { color: var(--txt-on-chat-2); opacity: .75; }
+  .r-inp .send { width: 42px; height: 42px; border-radius: 13px; background: var(--grad); color: var(--white); font-size: 15px; flex: none;
+    box-shadow: 0 4px 12px var(--glow); }
+  .r-inp .send.stop { background: var(--danger); }
+  /* ===== 右侧文件预览（改完不用切出去看；TA 改完自动打开） ===== */
+  .room { flex-direction: row; }
+  .r-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .r-preview { width: 46%; min-width: 300px; border-left: 1px solid var(--chat-line);
+    display: none; flex-direction: column; background: var(--pri-a04); }
+  .r-preview.open { display: flex; animation: pvIn var(--dur) var(--ease); }
+  @keyframes pvIn { from { opacity: 0; transform: translateX(10px); } }
+  .pv-head { display: flex; align-items: center; gap: 8px; padding: 12px 14px 8px; }
+  .pv-head .pv-name { font-size: 12.5px; color: var(--txt-on-chat); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pv-head button { -webkit-app-region: no-drag; cursor: pointer; border: 1px solid var(--chat-line);
+    background: var(--pri-a10); color: var(--txt-on-chat-2); border-radius: 9px; padding: 4px 9px; font-size: 11px; }
+  .pv-head button:hover { background: var(--pri-a20); color: var(--txt-on-chat); }
+  .pv-body { flex: 1; min-height: 0; position: relative; }
+  /* 预览内容来自**用户自己的文档**，一律当不可信：塞进 sandbox（无 allow-scripts）的 iframe，
+     里面的脚本一律不执行、也够不到 window.api（来源：hermes 的 DOMPurify + 严格 CSP 双保险） */
+  .pv-body iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: transparent; }
+  .pv-body table { border-collapse: collapse; font-size: 11px; }
+  .pv-body td, .pv-body th { border: 1px solid var(--w-18); padding: 2px 6px; }
+  .pv-body pre { white-space: pre-wrap; word-break: break-word; font-size: 11px; color: var(--txt-on-chat-2); }
+  .pv-body h4 { margin: 10px 0 4px; font-size: 12.5px; color: var(--accent-2); }
+  .r-head .pv-btn { -webkit-app-region: no-drag; cursor: pointer; width: 26px; height: 26px; border-radius: 50%; border: none;
+    background: var(--pri-a10); color: var(--txt-on-chat-2); font-size: 12.5px; margin-left: 0; }
+  .r-head .pv-btn:hover { background: var(--pri-a22); color: var(--txt-on-chat); }
+  .r-head .pv-btn .label-n { font-size: 9.5px; margin-left: 1px; opacity: .85; }
+  /* 命中区扩展：26px 的小圆钮视觉不变，可点区域撑到 ≥40×40。
+     量的时候注意：元素 rect 仍是 26×26（::after 不算进去），要靠 elementFromPoint 实测命中区。 */
+  .r-head .clip, .r-head .x, .r-head .pv-btn { position: relative; }
+  .r-head .clip::after, .r-head .x::after, .r-head .pv-btn::after { content: ''; position: absolute; inset: -9px; }
+  /* 预览工具条是紧凑行（gap 4px）：横向只撑 2px，撑满间隙且与邻居不重叠
+     （撑 9px 会互相压住 → 点「源代码」可能落到「✕」上，误关预览，比命中区小更糟） */
+  .r-head .pv-tools .pv-btn::after { inset: -9px -2px; }
+</style>
+</head>
+<body>
+  <div class="room">
+    <div class="r-main">
+      <div class="r-head">
+        <span class="who" id="who">TA</span>
+        <span class="sub" data-i18n="conv.sub.1">对话房间 · 历史都在家里</span>
+        <button class="clip" id="btn-clip" title="递个文件给 TA（也可直接拖文件进来）" data-i18n-title="conv.btn-clip.1"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
+        <button class="pv-btn" id="btn-pv" title="看 TA 改过的文件" data-i18n-title="conv.btn-pv.1">👁</button>
+        <button class="pv-btn" id="btn-labels" title="这一段里标过的句子" data-i18n-title="conv.btn-labels.1">🏷<span id="label-n" class="label-n"></span></button>
+        <button class="x" id="btn-x" title="收起" data-i18n-title="conv.btn-x.1">✕</button>
+      </div>
+      <div id="branch-bar" role="status"></div>
+    <div class="r-log" id="log"></div>
+      <div class="r-inp">
+        <!-- TA 在忙时的插话/排队队列，可取回 -->
+        <div id="queue-rows"></div>
+        <div id="file-chips"></div>
+        <input id="input" placeholder="继续和 TA 说点什么…（截图可以直接粘）" data-i18n-placeholder="conv.input.1">
+        <button id="mode-chip" title="TA 在忙时：这句是马上插进去，还是排在后面" data-i18n-title="conv.mode-chip.1" data-i18n="conv.mode-chip.2">插话</button>
+        <button class="send" id="send">➤</button>
+      </div>
+    </div>
+  </div>
+<script src="./state-words.js"></script>
+<script src="./i18n.js"></script>
+<script src="./components.js"></script>
+<script>
+'use strict';
+const $ = (id) => document.getElementById(id);
+const logEl = $('log');
+let streamingEl = null;
+/* 流式"只重画尾块"：与家页**同一套做法**（分片数组 + 尾块 appendData）——
+   原来每个 delta 都 `textContent = 累积文本`（全量替换 + 整块重排），长回复是 O(n²)。
+   流式期间不解析 markdown（纯文本），收尾才渲染一次；省掉的是那行全量替换。 */
+let streamingChunks = [];
+let streamingTail = null;
+let busy = false;
+let stopped = false;
+
+function addMsg(role, text) {
+  /* 她给的动作卡点了 = **你说了那句话** —— 走同一条 send()（不新开执行通道，
+     该问你的照样问）。send() 读的是输入框，所以这里先把文本放进输入框再调它（与手打完全同一条路）。 */
+  const onAction = (t) => {
+    try { const inp = $('input'); if (inp) inp.value = t; void send(); } catch { /* 发不出去就不发（不假装） */ }
+  };
+  const el = UI2.Message({ role: role === 'user' ? 'me' : role, text: role === 'sys' ? `${text}` : text, onAction });
+  logEl.append(el);
+  logEl.scrollTop = logEl.scrollHeight;
+  const bubble = el.querySelector('.m-bubble');
+  // **路径换成文件芯片**——同一个应用两页同一形态；识别与芯片行都在 components.js 一处实现，这里只注入 IPC。
+  if (role === 'user') UI2.attachFiles(bubble, text, chipOpts());
+  return bubble;
+}
+/* ===== 与 Home 同一条有序出口——回合登记 + seq 去重 + 两档插话 ===== */
+let curTurnId = null;
+let lastSeq = 0;
+let msgMode = 'steer';
+/* 滚动**合并到每帧一次**：每个 delta 都读一次 `scrollHeight` 会把每 delta 的成本从 ~0.02ms 拉到 ~15ms
+   ——读 `scrollHeight` 强制同步重排（layout thrashing），1500 个 delta 就是 22 秒。
+   一帧之内不管来多少 delta，只滚一次（`requestAnimationFrame` 合并）。 */
+let scrollQueued = false;
+function scrollToBottomSoon() {
+  if (scrollQueued) return;
+  scrollQueued = true;
+  requestAnimationFrame(() => { scrollQueued = false; logEl.scrollTop = logEl.scrollHeight; });
+}
+function streamingText() { return streamingChunks.join(''); }
+function ensureStreamingBubble() {
+  if (!streamingEl) { streamingEl = addMsg('assistant', ''); syncStreamingFull(streamingText()); }
+  return streamingEl;
+}
+/** 整段同步（重载/reattach）：重置尾块引用 */
+function syncStreamingFull(text) {
+  const el = ensureStreamingBubble();
+  el.textContent = String(text ?? '');
+  streamingTail = el.firstChild ?? null;
+  return el;
+}
+/** 只动尾块：delta 的常规路径 */
+function pushDelta(chunk) {
+  const d = String(chunk ?? '');
+  if (!d) return ensureStreamingBubble();
+  streamingChunks.push(d);
+  /* ⚠ 这里**不能**用 ensureStreamingBubble()：新建气泡时它会把 `streamingChunks` 里已有的内容
+     先同步进去，而下面又要 appendData 同一块 —— 第一个 delta 会被写**两遍**。
+     新建气泡时留空，让尾块负责写。 */
+  if (!streamingEl) { if (typeof openChat === 'function') openChat(); streamingEl = addMsg('assistant', ''); streamingTail = null; }
+  const el = streamingEl;
+  if (!streamingTail || streamingTail.parentNode !== el) {
+    el.textContent = '';
+    streamingTail = document.createTextNode('');
+    el.append(streamingTail);
+  }
+  streamingTail.appendData(d);
+  return el;
+}
+/* 进行中状态行——靠本地计时，不依赖 delta。与家页同一套（UI2.Pending）：
+   发话即出现，回合结束 ≥5 秒冻结成「已处理 N 秒」，否则消失。 */
+let pendingEl = null;
+function startPending() { settlePending(); pendingEl = UI2.Pending(); logEl.append(pendingEl.el); logEl.scrollTop = logEl.scrollHeight; }
+function settlePending() { if (pendingEl) { pendingEl.settle(); pendingEl = null; } }
+/* 把处理函数**起个名字**（原来是个匿名箭头函数）——生产路径一字不改，
+   但测试可以**走同一条路**喂 delta。 */
+function handleChatDelta(d) {
+  if (typeof d === 'string') { pushDelta(d); scrollToBottomSoon(); return; }
+  if (!d || typeof d !== 'object') return;
+  if (d.turnId !== curTurnId) {
+    curTurnId = d.turnId; lastSeq = 0;
+    if (streamingChunks.length) { streamingChunks = []; streamingTail = null; streamingEl = null; }
+  }
+  if (d.seq && d.seq <= lastSeq) return;
+  lastSeq = d.seq || lastSeq;
+  pushDelta(d.text ?? '');
+  scrollToBottomSoon();
+}
+window.api.onChatDelta(handleChatDelta);
+/* 过程节点流 —— 与家页**共用同一个组件**（UI2.StepFlow，见 components.js）。
+   这一间是"专门聊天的地方"，但聊着聊着让她去做事也很常见——看不见进度就只能干等。 */
+let stepFlow = null;
+function resetSteps() { if (stepFlow) stepFlow.finish(); }        // 只收尾，不丢引用（迟到的那一步要落回同一块）
+function newTurnSteps() { if (stepFlow) { stepFlow.finish(); stepFlow = null; } }
+function ensureStepBox() {
+  if (!stepFlow || !stepFlow.el.isConnected) { stepFlow = UI2.StepFlow(); logEl.append(stepFlow.el); }
+  else stepFlow.reopen();
+  return stepFlow;
+}
+window.api.onChatStep?.((ev) => {
+  try {
+    const f = ensureStepBox();
+    if (ev.phase === 'start') f.start(ev); else f.end(ev);
+    logEl.scrollTop = logEl.scrollHeight;
+  } catch { /* 过程块渲染失败不影响聊天 */ }
+});
+/* ⚠ 思考**不创建**过程卡——光有 reasoning 就画出「她的过程」，卡片里只有一条没头没尾的引文。
+   思考只挂进已存在的卡片（卡片由真正的工具步骤创建）。 */
+window.api.onChatThink?.((d) => { try { stepFlow?.think?.(String(d?.text ?? '')); } catch { /* 忽略 */ } });
+
+window.api.onChatFinal?.((d) => {
+  setTimeout(resetSteps, 300);   // 这一轮的过程块留在原地，下一轮重新开一块（与家页同款）
+  if (!d || (curTurnId && d.turnId !== curTurnId)) return;
+  const bubble = streamingEl;
+  if (!bubble) return;
+  streamingEl = null; streamingChunks = []; streamingTail = null;
+  // 中止与失败统一成**独立系统卡**，而且必须换**整条消息**——`bubble` 是内层 `.m-bubble`，
+  //   对它 replaceWith(整条消息) 会套娃（`.msg.ta > .m-av` 里再套一层 `.msg.ta > .m-av`）。
+  //   UI2.replaceMsg 负责找外层。
+  if (d.aborted && !(d.reply && String(d.reply).trim())) { UI2.replaceMsg(bubble, UI2.SystemCard({ text: DT('conv.js.card.1', '好，先停下了，想继续时告诉我。'), tone: 'note' })); return; }
+  if (d.ok) { bubble.textContent = d.reply ?? ''; return; }
+  UI2.replaceMsg(bubble, UI2.SystemCard({ text: DT('conv.js.tpl.1', '这次没完成：{p1}', { p1: d.reply || d.error || '出了点问题' }), tone: 'err',
+    ops: [{ label: '重试', onClick: () => send() }] }));
+});
+// ===== 右侧产物面板（与家页**共用同一个组件**：面包屑 + 源代码 + 打开）
+// 旧实现只有"名字 + 一个 iframe"——一处实现两处用，避免漂移。
+const pvPanel = UI2.PreviewPanel({
+  onOpen: (p) => window.api.previewOpenExternal?.(p),
+  onReveal: (p) => window.api.previewReveal?.(p),
+});
+document.body.append(pvPanel.el);
+let pvLast = null;
+function showPreview(item) {
+  if (!item?.html) return;
+  pvLast = item;
+  pvPanel.show(item);
+}
+$('btn-pv').addEventListener('click', () => { if (pvPanel.isOpen()) pvPanel.close(); else if (pvLast) pvPanel.show(pvLast); });
+// 这一轮 TA 改过的文档 → 自动开预览（"改完不用切出去看"）
+window.api.onFilesChanged?.((list) => {
+  const first = (list ?? []).find((x) => x?.html);
+  if (first) showPreview(first);
+});
+
+// TA 主动说的一句话（心跳/定时任务/里程碑）——进对话流
+window.api.onChatProactive?.((d) => {
+  if (!d?.text) return;
+  addMsg('assistant', d.text);
+  logEl.scrollTop = logEl.scrollHeight;
+});
+function renderQueue(q) {
+  const box = $('queue-rows');
+  const items = [
+    ...(q?.steers ?? []).map((it) => ({ ...it, kind: 'steer' })),
+    ...(q?.followups ?? []).map((it) => ({ ...it, kind: 'followup' })),
+  ];
+  box.innerHTML = '';
+  if (!items.length) { box.style.display = 'none'; return; }
+  box.style.display = 'flex';
+  for (const it of items) {
+    const row = document.createElement('div');
+    row.className = 'q-row';
+    const tag = document.createElement('span');
+    tag.style.flex = 'none'; tag.style.opacity = '.7';
+    tag.textContent = it.kind === 'steer' ? '插话' : '排队';
+    const txt = document.createElement('span');
+    txt.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+    txt.textContent = it.text;
+    const take = document.createElement('button');
+    take.textContent = '取回';
+    take.onclick = async () => {
+      const r = await window.api.chatQueueTake(it.kind, it.id).catch(() => null);
+      if (r?.ok) { $('input').value = r.item.text; $('input').focus(); }
+    };
+    row.append(tag, txt, take);
+    box.append(row);
+  }
+}
+window.api.onChatQueue?.((q) => renderQueue(q));
+/* ===== 审批卡 —— 你在哪个窗口，卡就在哪个窗口 =====
+   事件广播到三个窗口，答完广播 approval-resolved 收起其余。
+   文案全部来自宿主一处（`approvalCardPayload`），这里只排版、不造句。 */
+let approvalEl = null;
+let approvalId = null;
+function showApproval(d) {
+  if (!d?.id) return;
+  hideApproval();
+  approvalId = d.id;
+  approvalEl = UI2.ApprovalCard({
+    title: d.title, why: d.why, impact: d.impact, raw: d.raw, risk: d.risk,
+    // 缺 canSession 时按风险档推断（fail-safe：老调用方没带这个字段，不能当成"可以"）
+    canSession: typeof d.canSession === 'boolean' ? d.canSession : d.risk !== 'R5',
+    onDeny: () => window.api.approvalAnswer?.(d.id, 'deny'),
+    onAllowOnce: () => window.api.approvalAnswer?.(d.id, 'allow'),
+    onAllowSession: () => window.api.approvalAnswer?.(d.id, 'allow-session'),
+    // 第三态：宿主能给出一条**窄规矩**时才有这颗按钮（给不出就是 undefined）
+    canRule: d.canRule === true, ruleNote: d.ruleNote ?? '',
+    onAllowRule: d.canRule === true ? () => window.api.approvalAnswer?.(d.id, 'allow-rule') : null,
+  });
+  logEl.append(approvalEl);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+function hideApproval() { approvalEl?.remove(); approvalEl = null; approvalId = null; }
+window.api.onApprovalAsk?.((d) => showApproval(d));
+window.api.onApprovalResolved?.((d) => { if (!d?.id || d.id === approvalId) hideApproval(); });
+/** 窗口重开/重载：把还在等的那一张重画出来（宿主 reattach/status 里带着 pending） */
+function reshowPendingApproval(st) {
+  const p = (st?.pending ?? [])[0];
+  if (p?.id && p.id !== approvalId) showApproval(p);
+  else if (!p) hideApproval();
+}
+/* 撤销这一轮改动（按钮替你说出那句话；真正干活的是宿主那条路，与 `undo` 工具同一套动作）。
+   先问一句再动手——它改的是用户的文件，静默执行不可接受；回执如实说"写回几个 / 删掉几个 / 哪几个没退成"。 */
+async function undoThisTurn(turnId = null) {
+  /* `turnId` = 产物卡自己那一轮；不传才退回"最近一轮"的老行为 */
+  const info = await window.api.turnChanges?.(turnId).catch(() => null);
+  const n = info?.items?.length ?? 0;
+  if (!n) { UI2.Toast(DT('conv.js.toast.1', '这一轮没改过文件，没什么可退的'), ''); return false; }
+  if (info.undone) { UI2.Toast(DT('conv.js.toast.9', '这一轮已经退回去过了——不重复退（再退会删掉你后来新建的文件）'), ''); return true; }
+  const names = info.items.map((i) => `${String(i.path).split('/').pop()}${i.created ? '（新建）' : ''}`).join('、');
+  const go = await new Promise((resolve) => {
+    const box = document.createElement('div');
+    box.textContent = DT('conv.js.tpl.2', '这一轮改过 {p1} 个文件：{p2}。退回到改动前？这一轮新建的会送进回收站。', { p1: n, p2: names });
+    UI2.Modal({ title: '撤销这次改动？', body: box, actions: [{ label: '退回去', onClick: () => resolve(true) }], onClose: () => resolve(false) });
+  });
+  if (!go) return false;
+  const r = await window.api.undoLastTurn?.(turnId).catch(() => null);
+  if (!r?.ok) { UI2.Toast(DT('conv.js.toast.2', '没退成：') + (r?.error ?? '未知原因'), 'err'); return false; }
+  const bad = (r.failed ?? []).length;
+  const msg = DT('conv.js.tpl.3', '退回去了：写回 {p1} 个', { p1: (r.restored ?? []).length })
+    + ((r.removed ?? []).length ? DT('conv.js.tpl.4', ' · 删掉新建 {p1} 个', { p1: r.removed.length }) : '')
+    + (bad ? DT('conv.js.tpl.5', ' · {p1} 个没退成', { p1: bad }) : '');
+  UI2.Toast(msg, bad ? 'err' : 'ok');
+  return true;
+}
+
+
+window.api.onSessionStatus?.((st) => {
+  try { reshowPendingApproval(st); } catch { /* 卡片渲染失败不影响状态 */ }
+  setBusy(st?.state === 'Active'); // 多窗口一致的在忙状态
+});
+/* 房间那行字与家页**同一处真源**——
+   ev.pending = 「正在思考」这类进行态用词；ev.step = 她正在做的那一步（"正在看资料"）。
+   ⚠ 不能用 `st?.detail || st?.label`：session-status 载荷里**从来没有这两个字段**，
+   否则那行字永远只有默认的"正在思考"，也不会跟着她在干什么变。 */
+window.api.onTaskState?.((ev) => {
+  if (!pendingEl) return;
+  const st = ev?.to ?? ev?.state;
+  const word = ev?.pending;
+  if (!word) return;
+  pendingEl.setText(st === 'Working' && ev?.step ? ev.step : String(word));
+});
+function setBusy(on) {
+  busy = on;
+  $('send').textContent = on ? '■' : '➤';
+  $('send').classList.toggle('stop', on);
+  $('mode-chip').style.display = on ? '' : 'none';
+}
+$('mode-chip').onclick = () => {
+  msgMode = msgMode === 'steer' ? 'followup' : 'steer';
+  $('mode-chip').textContent = msgMode === 'steer' ? '插话' : '排队';
+};
+/* ===== 这次的产出（产物卡） =====
+   同家页一套语义：只列这一次的产出，"打开/在文件夹里显示"都走已有通道（不新开执行通道）。 */
+function renderArtifacts(r, bubbleEl) {
+  const items = r?.artifacts ?? [];
+  if (!items.length) return;
+  const card = UI2.ArtifactCard({
+    items,
+    onOpen: (a) => { if (a.path) void window.api.previewOpenExternal?.(a.path).catch(() => null); },
+    onReveal: (a) => { if (a.path) void window.api.previewReveal?.(a.path).catch(() => null); },
+    onUndo: () => undoThisTurn(r?.turnId ?? null),   // 撤销**这一轮**改动（带卡片自己那轮的 id）
+  });
+  if (!card) return;
+  logEl.append(card);   // 挂在**对话列**上整行铺开（塞进消息行会跟正文抢宽度 → 窄窗挤成竖排字）
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+/* ===== 回到这句重说（对话树） =====
+   与家页同一套语义：只给**我的**消息挂动作；点了从这条消息分岔，宿主把**我的原话**交还输入框。 */
+function attachLookback(msgEl, mid) {
+  if (!msgEl || !mid || msgEl.dataset.lookback === '1') return;
+  msgEl.dataset.lookback = '1';
+  msgEl.dataset.mid = String(mid);
+  msgEl.classList.add('lookback-able');
+  if (msgEl.querySelector('.lookback')) return;
+  const btn = document.createElement('button');
+  btn.className = 'lookback';
+  btn.type = 'button';
+  btn.textContent = '↩ 回到这句重说';
+  btn.title = '从这句重新说一遍：原来那条分支会留着，随时能回去';
+  btn.addEventListener('click', (e) => { e.stopPropagation(); void branchAt(String(mid)); });
+  msgEl.append(btn);
+}
+
+async function branchAt(mid) {
+  const r = await window.api.chatBranch?.(mid).catch(() => null);
+  if (!r || !r.ok) {
+    UI2.Toast(r?.error === '没找到那条消息（可能已经被回退掉了）' ? '这句话已经不在当前分支上了' : (r?.error ?? '这次没分成，再试一次？'), 'err');
+    return;
+  }
+  const inp = $('input');
+  if (inp) { inp.value = r.text || ''; inp.focus(); }
+  await refreshBranchBar();
+  UI2.Toast(DT('conv.js.toast.3', '开了一条新分支，原来那条还在——想回去点上面的小标'), 'ok');
+}
+
+async function refreshBranchBar() {
+  const bar = $('branch-bar');
+  const info = await window.api.chatBranchInfo?.().catch(() => null);
+  if (!bar || !info?.ok) return;
+  if (!info.isBranch) { bar.classList.remove('on'); bar.replaceChildren(); return; }
+  const list = await window.api.chatBranches?.().catch(() => null);
+  const others = (list?.branches ?? []).filter((b) => !b.current);
+  bar.replaceChildren();
+  const label = document.createElement('span');
+  label.textContent = '↩ 你在一条新分支上 —— 老的那条还在';
+  bar.append(label);
+  if (others.length) {
+    const go = document.createElement('button');
+    go.type = 'button';
+    go.textContent = others.length === 1 ? '回到原来那条 ›' : DT('conv.js.tpl.6', '回到别的分支（{p1} 条）›', { p1: others.length });
+    go.addEventListener('click', async () => {
+      const target = others.length === 1 ? others[0].id : await pickBranch(others);
+      if (!target) return;
+      const r = await window.api.chatBranchSwitch?.(target).catch(() => null);
+      if (!r?.ok) { UI2.Toast(DT('conv.js.toast.4', '切不过去：') + (r?.error ?? '未知原因'), 'err'); return; }
+      await loadHistory({ hard: true });
+      await refreshBranchBar();
+      UI2.Toast(DT('conv.js.toast.5', '回到那条分支了'), 'ok');
+    });
+    bar.append(go);
+  }
+  bar.classList.add('on');
+}
+
+function pickBranch(branches) {
+  return new Promise((resolve) => {
+    const wrap = document.createElement('div');
+    for (const b of branches) {
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'btn sm ghost';
+      row.style.display = 'block';
+      row.style.margin = '4px 0';
+      row.textContent = DT('conv.js.tpl.7', '{p1}　（{p2} 条）', { p1: b.id, p2: b.count });
+      row.addEventListener('click', () => { close(); resolve(b.id); });
+      wrap.append(row);
+    }
+    const close = UI2.Modal({ title: '回到哪条分支？', body: wrap, onClose: () => resolve(null) });
+  });
+}
+
+/* ⚠ **只清"上一次画的历史"**，不清整块对话流——
+   第一版用 `replaceChildren()` 清空，把**在这之前刚落进来的审批卡**一起抹了。
+   换分支要整块重画时才用 `hard: true`。 */
+async function loadHistory({ hard = false } = {}) {
+  const hist = await window.api.chatHistory(14).catch(() => null);
+  if (hard) logEl.replaceChildren();
+  else logEl.querySelectorAll('[data-hist="1"]').forEach((n) => n.remove());
+  if (hist?.ok && hist.chats.length) {
+    for (const c of hist.chats) markHist(addMsg(c.role, c.text));
+    markHist(addMsg('sys', '——今天的对话,接着聊就好——'));
+  }
+  await attachMessageActions();
+}
+
+/** 给"历史回放"画出来的节点打个标记（下次重画只删这些，别人的卡别动） */
+function markHist(bubble) {
+  const el = bubble && bubble.closest ? bubble.closest('.msg') : bubble;
+  if (el && el.setAttribute) el.setAttribute('data-hist', '1');
+  return bubble;
+}
+
+/* ===== 标记（标签/书签） =====
+   实现是**共用的那一份**（`UI2.LabelKit`，家页同一个）：标签是追加事实（再标覆盖、空串摘掉），
+   对号入座靠正文不靠位置（标错人比不给标更糟，对不上就不挂）。这里只接本页的元素与宿主 IPC。 */
+const labels = UI2.LabelKit({
+  container: logEl,
+  onCountChange: (n) => {
+    const el = $('label-n');
+    if (el) el.textContent = n ? String(n) : '';
+    const btn = $('btn-labels');
+    if (btn) btn.title = n ? DT('conv.js.tpl.8', '这一段标了 {p1} 处——点开看看', { p1: n }) : '这一段还没标过（把鼠标放到某句话上就能标）';
+  },
+});
+
+/** 把宿主给的 id 认到这一行上（挂按钮前调用） */
+function setMid(msgEl, mid) {
+  if (msgEl && mid) msgEl.dataset.mid = String(mid);
+  return msgEl;
+}
+
+/** 给画出来的行补挂「回到这句重说」（我的才挂）+「🏷 标记」（两边都挂） */
+async function attachMessageActions() {
+  const sm = await window.api.sessionMessages?.(60).catch(() => null);
+  if (sm?.ok) labels.attachFromSession(sm.messages);
+  await labels.refresh();
+}
+
+$('btn-labels').onclick = () => { void labels.open(); };
+
+async function send() {
+  const input = $('input');
+  const typed = input.value.trim();          // 用户自己打的字（失败时要还回去的就是它）
+  // 挂着的文件芯片 → 拼回内核看得懂的文本（**与家页同一格式、逐字一致**）
+  let text = typed;
+  if (pendingFiles.length) {
+    const list = pendingFiles.join('、');
+    text = typed ? DT('conv.js.tpl.9', '{p1} 帮我处理这个文件：{p2}', { p1: typed, p2: list }) : DT('conv.js.tpl.10', '帮我处理这个文件：{p1}', { p1: list });
+  }
+  const images = pendingImages;
+  if (!text && !images.length) return;
+  if (busy) {
+    // 插话/排队不带图（内核只有整回合能看图）→ 图还挂着时不许走插话，免得图片被静默丢掉
+    if (images.length) { UI2.Toast(DT('conv.js.toast.6', '她手上还有活——等这一轮完了再发图，先给你留在框里'), ''); return; }
+    // TA 在忙——默认插话，可切排队
+    input.value = '';
+    const r = msgMode === 'followup'
+      ? await window.api.chatFollowUp(text).catch(() => null)
+      : await window.api.chatSteer(text, curTurnId).catch(() => null);
+    if (r?.ok) { input.focus(); return; }
+    if (r?.reason === 'no-active-turn') { setBusy(false); return send(); }
+    input.value = typed;
+    return;
+  }
+  if (!text && images.length) text = images.length > 1 ? '看看这几张截图' : '看看这张截图';
+  input.value = '';
+  pendingFiles = []; pendingImages = []; renderFileChips();   // 附件随这一句一起走（失败也不会丢：文本里已经带着路径）
+  stopped = false;
+  newTurnSteps();   // 新回合 → 上一块过程收尾留在原地，这一轮的步骤开新块
+  const userMsgEl = addMsg('user', text);
+  startPending(); // 发话即出现；空气泡由 CSS 藏起来（有内容才露头）
+  streamingChunks = []; streamingTail = null;
+  streamingEl = addMsg('assistant', '');
+  streamingEl.textContent = '';
+  curTurnId = null; lastSeq = 0;
+  setBusy(true);
+  let r;
+  try { r = await window.api.chat(text, images); } catch (e) { r = { ok: false, error: e?.message ?? String(e) }; }
+  settlePending(); // 回合收敛的唯一出口（ok / 中止 / 报错都走这里）
+  setBusy(false);
+  /* ⚠ 顺序不能反：原来先 `renderArtifacts(r, bubble)`、`const bubble` 却声明在后面 ——
+     **暂时性死区**（const 声明前的引用）当场抛 ReferenceError，产物卡根本没画过、
+     中止/报错那两条收尾分支也永远走不到（外观上看不出来：流式的字早就贴上去了）。 */
+  const bubble = streamingEl;
+  streamingEl = null;
+  streamingChunks = []; streamingTail = null;
+  if (r?.mid) attachLookback(userMsgEl?.closest?.('.msg') ?? null, r.mid);   // 回到这句重说
+  renderArtifacts(r, bubble);                                                // 这次的产出
+  void refreshBranchBar();
+  /* 这一轮的**我和你**都用宿主给的 id 挂「🏷 标记」（不按正文猜）。 */
+  if (r?.mid) labels.attach(setMid(userMsgEl?.closest?.('.msg') ?? null, r.mid));
+  if (r?.aid) labels.attach(setMid(bubble?.closest?.('.msg') ?? null, r.aid));
+  if (!bubble) { void attachMessageActions(); return; } // chat-final 已渲染
+  if (stopped || r.aborted) {
+    if (r.reply && String(r.reply).trim() && !/^（已停止）$/.test(String(r.reply))) bubble.textContent = r.reply;
+    else UI2.replaceMsg(bubble, UI2.SystemCard({ text: DT('conv.js.card.2', '好，先停下了，想继续时告诉我。'), tone: 'note' }));
+  } else if (r.ok) bubble.textContent = r.reply;
+  else UI2.replaceMsg(bubble, UI2.SystemCard({ text: DT('conv.js.tpl.11', '这次没完成：{p1}', { p1: r.reply || r.error || '出了点问题' }), tone: 'err',
+    ops: [{ label: '重试', onClick: () => send() }] }));
+  logEl.scrollTop = logEl.scrollHeight;
+  void labels.refresh();   // 把标签状态刷新一遍（挂按钮走上面那两行宿主 id）
+}
+$('send').addEventListener('click', async () => {
+  if (!busy) { void send(); return; }
+  stopped = true;
+  const r = await window.api.chatStop().catch(() => null);
+  const items = r?.returned ?? [];
+  if (items.length) {
+    const input = $('input');
+    input.value = [input.value.trim(), ...items.map((it) => it.text)].filter(Boolean).join('\n');
+    input.focus();
+  }
+});
+$('input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); void send(); }
+});
+$('btn-x').addEventListener('click', () => window.api.convClose());
+
+/* ---- 长聊时递文件——📎 选、或直接把文件拖进房间（都挂成芯片，见下） ---- */
+/* 待发出的文件（📎 选的 / 拖进来的）——**挂芯片**，不再把一串路径塞进输入框
+   （用户看到的是"文件"，不是路径；家页早就是这个形态）。给内核的文本一个字没变：
+   发送时照旧拼成「… 帮我处理这个文件：/路径、/路径」（见 send）。 */
+let pendingFiles = [];
+let pendingImages = [];   // 剪贴板来的截图（data URL）——与家页同一套
+const MAX_IMAGES = 4;
+async function renderFileChips() {
+  const box = $('file-chips');
+  if (!box) return;
+  box.replaceChildren();
+  if (!pendingFiles.length && !pendingImages.length) { box.style.display = 'none'; return; }
+  box.style.display = 'flex';
+  pendingImages.forEach((src, i) => box.append(UI2.ImageThumb({
+    src, caption: pendingImages.length > 1 ? DT('conv.js.tpl.12', '截图 {p1}', { p1: i + 1 }) : '截图',
+    onRemove: () => { pendingImages = pendingImages.filter((x) => x !== src); renderFileChips(); },
+  })));
+  if (pendingFiles.length) box.append(await UI2.FileChipRow(pendingFiles, chipOpts({
+    onRemove: (p) => { pendingFiles = pendingFiles.filter((x) => x !== p); renderFileChips(); },
+  })));
+}
+/** 剪贴板里的图 → 缩略图（只认图；纯文字粘贴不拦） */
+function addPastedImage(dataUrl) {
+  if (pendingImages.length >= MAX_IMAGES) { UI2.Toast(DT('conv.js.tpl.13', '一次最多带 {p1} 张截图，先发一批或者去掉一张', { p1: MAX_IMAGES }), 'err'); return; }
+  pendingImages.push(dataUrl);
+  renderFileChips();
+}
+$('input').addEventListener('paste', (e) => {
+  const items = [...(e.clipboardData?.items ?? [])].filter((it) => String(it.type ?? '').startsWith('image/'));
+  if (!items.length) return;
+  e.preventDefault();
+  for (const it of items) {
+    const file = it.getAsFile?.();
+    if (!file) continue;
+    const fr = new FileReader();
+    fr.onload = () => addPastedImage(String(fr.result ?? ''));
+    fr.onerror = () => UI2.Toast(DT('conv.js.toast.7', '这张图没读出来，换个方式（拖进来或 📎）试试'), 'err');
+    fr.readAsDataURL(file);
+  }
+});
+function chipOpts(extra = {}) {
+  return { fetchInfo: fileInfoOf, onOpen: (p) => openPreview2(p), ...extra };
+}
+async function fileInfoOf(p) { try { return (await window.api.fileInfo?.(p)) ?? null; } catch { return null; } }
+/** 房间里的「打开」→ 用房间自己的产物面板（家页那套是家页的 pvPanel） */
+async function openPreview2(p) {
+  const r = await window.api.previewFile?.(p).catch(() => null);
+  if (r?.ok) showPreview({ path: r.path, name: r.name, html: r.html, text: r.text });
+  else UI2.Toast(r?.error ?? '这个文件打不开', 'err');
+}
+function handFilesToInput(paths) {
+  pendingFiles = [...new Set([...pendingFiles, ...paths])];
+  renderFileChips();
+  $('input').focus();
+}
+$('btn-clip').addEventListener('click', async () => {
+  const r = await window.api.filePick().catch(() => null);
+  if (r?.ok && r.paths?.length) handFilesToInput(r.paths);
+});
+const room = document.querySelector('.room');
+room.addEventListener('dragenter', (e) => { e.preventDefault(); room.classList.add('dragover'); });
+room.addEventListener('dragover', (e) => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'; });
+room.addEventListener('dragleave', (e) => { if (!room.contains(e.relatedTarget)) room.classList.remove('dragover'); });
+room.addEventListener('drop', (e) => {
+  e.preventDefault();
+  room.classList.remove('dragover');
+  // 同上，File.path 在 Electron 33 已不存在 → 走 preload 的 getPathForFile
+  const dropped = [...(e.dataTransfer?.files ?? [])];
+  const paths = dropped.map((f) => window.api.getPathForFile?.(f) ?? '').filter(Boolean);
+  if (paths.length) handFilesToInput(paths);
+  else if (dropped.length) UI2.Toast(DT('conv.js.toast.8', '没读到拖进来的文件路径——用上面的 📎 选文件也一样'), '');
+});
+
+(async () => {
+  const s = await window.api.status().catch(() => null);
+  if (s?.bound) {
+    const prof = await window.api.petProfile().catch(() => null);
+    $('who').textContent = prof?.selections?.name || 'TA';
+    await loadHistory();
+    // 在途回合/队列/状态一次问全——重载不丢话
+    const ra = await window.api.chatReattach?.().catch(() => null);
+    if (ra?.ok) {
+      if (ra.turn) {
+        curTurnId = ra.turn.id; lastSeq = ra.turn.seq;
+        if (ra.turn.text) {
+          streamingChunks = [ra.turn.text]; streamingTail = null; streamingEl = null;
+          streamingEl = addMsg('assistant', '');
+          syncStreamingFull(ra.turn.text);
+        }
+      }
+      setBusy(ra.status?.state === 'Active');
+      renderQueue(ra.queue);
+    }
+  }
+  $('input').focus();
+})();
+</script>
+</body>
+</html>

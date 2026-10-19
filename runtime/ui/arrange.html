@@ -1,0 +1,194 @@
+<!doctype html>
+<!-- 灵核 · 帮我安排
+
+     这一页**不是新功能，是把已有的东西露出界面**：
+       · 提醒 = `cronJobList()`（brain 的 schedule 工具在写 <dataDir>/cron/jobs.json，一直在跑，只是没页面）
+       · 日程 = `calendarUpcoming()`（节假日/节气/生日都在现有数据里）
+       · 计划 = `taskList()`（与「她的过程」「结果卡」同一份任务账本）+ 暂停/接着干/不做了
+     三个入口：① 形象端双击面板的「帮我安排」卡 ② 形象端右键菜单 ③ 灵核家右栏待办（同源）。 -->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title data-i18n="arrange.page.1">灵核 · 帮我安排</title>
+<link rel="stylesheet" href="./ui.css">
+<style>
+  html, body { height: 100%; }
+  body { background: var(--bg); display: flex; flex-direction: column; }
+  .topbar { display: flex; align-items: center; gap: 10px; padding: 14px 18px 10px; flex: none;
+    -webkit-app-region: drag; }
+  .topbar .tb-t { font-size: var(--fs-lg); font-weight: 600; color: var(--ink); letter-spacing: 1px;
+    display: flex; align-items: center; gap: 8px; }
+  .topbar .tb-t .ic { width: 26px; height: 26px; border-radius: 8px; background: var(--grad); flex: none;
+    display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px var(--glow); }
+  .topbar .back { margin-left: auto; -webkit-app-region: no-drag; font-size: var(--fs-sm); color: var(--ink2);
+    padding: 6px 12px; border-radius: var(--r-rect); position: relative; }
+  .topbar .back::after { content: ''; position: absolute; inset: -11px -6px; }   /* 命中区 ≥40（视觉不变） */
+  .topbar .back:hover { background: var(--row); color: var(--ink); }
+  .wrap { flex: 1; min-height: 0; overflow-y: auto; padding: 0 18px 18px; }
+  .arr { background: var(--card-solid); border-radius: var(--radius-card); box-shadow: var(--shadow-soft); overflow: hidden; }
+  .tabs { display: flex; gap: 3px; padding: 12px 13px 0; }
+  /* 命中区（可点范围 ≥40×40，视觉尺寸不变）——用 ::after 往外撑。
+     页签横向邻居 gap 3px，所以横向只撑 4px（撑满会抢邻居的点击）。 */
+  .tabs button { font-size: var(--fs-sm); padding: 5px 13px; border-radius: var(--r-rect); color: var(--ink2); position: relative; }
+  .tabs button::after { content: ''; position: absolute; inset: -9px -4px; }
+  .tabs button:hover { background: var(--row); }
+  .tabs button.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .body { padding: 11px 13px 13px; display: flex; flex-direction: column; gap: 6px; }
+  .arow { display: flex; align-items: center; gap: 9px; padding: 8px 9px; border-radius: var(--r-rect); background: var(--row); }
+  .arow .ai { width: 26px; height: 26px; border-radius: var(--r-rect); display: flex; align-items: center;
+    justify-content: center; flex: none; background: var(--accent-soft); color: var(--accent); }
+  .arow .ax { flex: 1; min-width: 0; font-size: var(--fs-sm); color: var(--ink); }
+  .arow .ax i { display: block; font-style: normal; font-size: var(--fs-xs); color: var(--ink2); margin-top: 2px; line-height: 1.5; }
+  .arow .aw { font-size: var(--fs-xs); color: var(--ink2); flex: none; text-align: right; line-height: 1.5; }
+  .arow .ops { display: flex; gap: 5px; flex: none; }
+  .arow .ops button { font-size: var(--fs-xs); padding: 4px 9px; border-radius: var(--r-rect);
+    background: var(--accent-soft); color: var(--accent); font-weight: 600; position: relative; }
+  /* 同一行两颗钮（gap 5px）：纵向撑 12px（高 17 → 41 ✓），横向只撑 2px 免得互相压住 */
+  .arow .ops button::after { content: ''; position: absolute; inset: -12px -2px; }
+  .arow .ops button:hover { background: var(--accent-veil-2); }
+  .arow .ops button.danger { background: var(--pri-high-bg); color: var(--danger); }
+  .empty { font-size: var(--fs-sm); color: var(--ink2); text-align: center; padding: 18px 10px; line-height: 1.7; }
+  .link { margin: 0 13px 13px; font-size: var(--fs-xs); color: var(--accent); background: var(--accent-soft);
+    border-radius: var(--r-rect); padding: 7px 9px; line-height: 1.6; }
+  .link[hidden] { display: none; }
+</style>
+</head>
+<body class="lt">
+  <header class="topbar">
+    <div class="tb-t" data-i18n="arrange.tb-t.1">
+      <span class="ic star-ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 2.4 13.9 9.6 21.6 12 13.9 14.4 12 21.6 10.1 14.4 2.4 12 10.1 9.6Z"/><circle cx="12" cy="12" r="2.3"/></svg></span>
+      帮我安排
+    </div>
+    <button class="back" id="btn-close" data-i18n="arrange.btn-close.1">‹ 收起</button>
+  </header>
+
+  <div class="wrap">
+    <div class="arr">
+      <div class="tabs" id="tabs">
+        <button class="on" data-t="remind" data-i18n="arrange.on.1">提醒</button>
+        <button data-t="days" data-i18n="arrange.tabs.1">日程</button>
+        <button data-t="plan" data-i18n="arrange.tabs.2">计划</button>
+      </div>
+      <div class="body" id="body"><div class="empty" data-i18n="arrange.empty.1">加载中…</div></div>
+    </div>
+    <div class="link" id="link" hidden></div>
+  </div>
+
+<script src="./i18n.js"></script>
+
+<script src="./components.js"></script>
+<script>
+'use strict';
+const $ = (id) => document.getElementById(id);
+const h = UI2.h;
+const esc = (s) => String(s ?? '').replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+let tab = (new URLSearchParams(location.search).get('tab')) || 'remind';
+if (!['remind', 'days', 'plan'].includes(tab)) tab = 'remind';
+
+/** 未来时刻 → 人话倒计时（今天/明天/N 天后/已经过了） */
+function whenText(ts) {
+  if (!ts) return '';
+  const d = new Date(Number(ts));
+  const today = new Date();
+  const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diff = Math.round((day(d) - day(today)) / 86400000);
+  const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  if (diff < 0) return '已经过了';
+  if (diff === 0) return DT('arrange.js.tpl.1', '今天 {p1}', { p1: hm });
+  if (diff === 1) return DT('arrange.js.tpl.2', '明天 {p1}', { p1: hm });
+  return DT('arrange.js.tpl.3', '{p1} 天后', { p1: diff });
+}
+const TIPS = {
+  remind: 'arrange.link.remind',
+  days: 'arrange.link.days',
+  plan: 'arrange.link.plan',
+};
+
+function row({ icon, text, sub, value, ops }) {
+  return h('div', { class: 'arow' }, [
+    h('span', { class: 'ai', text: icon }),
+    h('span', { class: 'ax' }, [h('span', { text }), sub ? h('i', { text: sub }) : null].filter(Boolean)),
+    value ? h('span', { class: 'aw', text: value }) : null,
+    ops && ops.length ? h('span', { class: 'ops' }, ops.map((o) => h('button', {
+      class: o.danger ? 'danger' : '', text: o.label,
+      onclick: async () => { await o.onClick(); render(); },
+    }))) : null,
+  ].filter(Boolean));
+}
+
+async function render() {
+  for (const b of document.querySelectorAll('#tabs button')) b.classList.toggle('on', b.dataset.t === tab);
+  const body = $('body');
+  body.replaceChildren(h('div', { class: 'empty', text: '加载中…' }));
+  const link = $('link');
+  link.hidden = false;
+  link.textContent = T(TIPS[tab]);   // ⚠ 必须用大写 T(...)：小写 t 全局不存在，会抛 ReferenceError
+
+  try {
+    if (tab === 'remind') {
+      const list = await window.api.cronList?.().catch(() => null) ?? [];
+      const items = Array.isArray(list) ? list : [];
+      if (!items.length) return void body.replaceChildren(h('div', { class: 'empty', html: DT('arrange.empty', '还没有说好的事。<br>跟她说一句「明天早上八点叫我」，就会出现在这儿。') }));
+      body.replaceChildren(...items.map((j) => row({
+        icon: '🔔',
+        text: j.task || '(没说做什么)',
+        sub: j.kind === 'once' ? '一次性的，办完自动收起' : DT('arrange.js.tpl.4', '按点重复：{p1}', { p1: j.spec || '' }),
+        value: whenText(j.nextRunAt) || (j.enabled ? '' : '已停'),
+        ops: [{ label: '不做了', danger: true, onClick: async () => { await window.api.cronCancel?.(j.id); } }],
+      })));
+      return;
+    }
+
+    if (tab === 'days') {
+      const r = await window.api.calendarUpcoming?.(8).catch(() => null);
+      const items = (r?.ok ? r.upcoming : []) ?? [];
+      if (!items.length) return void body.replaceChildren(h('div', { class: 'empty', html: '接下来 400 天里没有假期、节气或生日。<br>想记住谁的生日，在日历上点那天就能加。' }));
+      body.replaceChildren(...items.map((u) => {
+        const [y, m, d] = String(u.date).split('-');
+        const bday = u.tags.find((t) => t.startsWith('生日·'));
+        return row({
+          icon: bday ? '🎂' : '📅',
+          text: `${Number(m)} / ${Number(d)}　${u.tags.filter((t) => !t.startsWith('生日·')).join(' · ') || (bday ? '生日' : '')}`,
+          sub: bday ? DT('arrange.js.tpl.5', '每年都提醒：{p1}', { p1: bday.slice(3) }) : (u.lunar || ''),
+          value: u.daysAway === 0 ? '就是今天' : DT('arrange.js.tpl.6', '还有 {p1} 天', { p1: u.daysAway }),
+        });
+      }));
+      return;
+    }
+
+    // 计划 = 任务账本（和「她的过程」「结果卡」同一份）
+    const list = await window.api.taskList?.().catch(() => null) ?? [];
+    const items = Array.isArray(list) ? list : [];
+    if (!items.length) return void body.replaceChildren(h('div', { class: 'empty', html: '手上没有正在做的活。<br>说一件要做的，她会拆成步骤，这儿就能看进度。' }));
+    const ICON = { running: '🔨', pending: '🔨', paused: '⏸', blocked: '⛔', completed: '✅', failed: '⚠️', cancelled: '🚫' };
+    body.replaceChildren(...items.map((t) => {
+      const p = t.progress ?? { done: 0, total: 0 };
+      const ops = [];
+      if (['running', 'pending'].includes(t.state)) ops.push({ label: '暂停', onClick: async () => { await window.api.taskControl?.(t.id, 'pause'); } });
+      else if (['paused', 'blocked', 'usage_limited', 'budget_limited'].includes(t.state)) ops.push({ label: '接着干', onClick: async () => { await window.api.taskControl?.(t.id, 'resume'); } });
+      if (!['completed', 'cancelled'].includes(t.state)) ops.push({ label: '不做了', danger: true, onClick: async () => { await window.api.taskControl?.(t.id, 'cancel'); } });
+      return row({
+        icon: ICON[t.state] ?? '🔨',
+        text: t.title || '手头这件事',
+        sub: `${p.done}/${p.total} 步${t.explanation ? ` · ${t.explanation}` : ''}`,
+        value: t.label || '',
+        ops,
+      });
+    }));
+  } catch (e) {
+    body.replaceChildren(h('div', { class: 'empty', text: DT('arrange.js.tpl.7', '这一页没渲染出来：{p1}', { p1: e?.message ?? e }) }));
+  }
+}
+
+for (const b of document.querySelectorAll('#tabs button')) {
+  b.addEventListener('click', () => { tab = b.dataset.t; render(); });
+}
+$('btn-close')?.addEventListener('click', () => window.close());
+render();
+// 词表是异步到的（I18N.ready）：首屏那一次可能只拿到键名（顶部那句说明就是这样），到货后重刷一遍
+window.I18N?.ready?.finally?.(() => render());
+// 同窗口内切换（灵核家右栏点待办会带着 tab 参数重开）：每秒看一眼时间文案会过期，5 分钟刷一次就够
+setInterval(render, 5 * 60 * 1000);
+</script>
+</body>
+</html>

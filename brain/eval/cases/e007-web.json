@@ -1,0 +1,20 @@
+{
+  "id": "e007",
+  "name": "网络：web_search 返回带 URL 的来源（mock 后端）",
+  "net": {
+    "duckduckgo": "<a class=\"result__a\" href=\"//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com%2Fnews\">新闻标题</a><a class=\"result__snippet\">今日新闻摘要</a>"
+  },
+  "sessions": [
+    {
+      "task": "搜索今天的新闻",
+      "script": [
+        { "calls": [{ "id": "c1", "name": "web_search", "args": { "query": "新闻" } }] },
+        { "text": "搜索完成" }
+      ]
+    }
+  ],
+  "checks": [
+    { "type": "tool-result-contains", "contains": "https://example.com/news" },
+    { "type": "tool-result-contains", "contains": "新闻标题" }
+  ]
+}

@@ -1,0 +1,255 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://digitalhuman.local/spec.schema.json",
+  "title": "Digital Human Spec v1（定稿）",
+  "description": "数字人规格：一个数字人 = 一份 spec。可携带包 = spec 全量（不含索引），同步单元 = memory.log 增量。向前兼容规则：新字段带默认值，未知字段保留不丢弃。",
+  "type": "object",
+  "required": ["spec_version", "identity", "persona", "memory", "capability", "life"],
+  "properties": {
+    "spec_version": { "type": "integer", "const": 1 },
+
+    "identity": {
+      "type": "object",
+      "description": "身份锚点。traits_locked 出生选配固化（面容/身材支持显式更换：频率用户可配置、可上传自定义图片，更换入日志）；seed 只以加密分片形式存在，永不上云。",
+      "required": ["genesis", "traits_locked"],
+      "properties": {
+        "genesis": {
+          "type": "object",
+          "required": ["seed_hash", "birth_timestamp", "spec_version"],
+          "properties": {
+            "seed_hash": { "type": "string", "description": "种子哈希，作为日志 root" },
+            "birth_timestamp": { "type": "string", "format": "date-time" },
+            "spec_version": { "type": "integer" }
+          }
+        },
+        "traits_locked": {
+          "type": "object",
+          "required": ["gender", "face_params", "body_params", "voice_params"],
+          "properties": {
+            "gender": { "enum": ["female", "male", "neutral"] },
+            "face_params": {
+              "type": "object",
+              "description": "身份特征层参数（骨骼/五官/瞳色/脸型），出生锁定",
+              "additionalProperties": { "type": "number" }
+            },
+            "body_params": {
+              "type": "object",
+              "description": "身材基因参数（身高曲线/体型倾向/肩宽腰围比），出生锁定",
+              "additionalProperties": { "type": "number" }
+            },
+            "voice_params": {
+              "type": "object",
+              "description": "音色基因参数向量，出生锁定",
+              "additionalProperties": { "type": "number" }
+            }
+          }
+        },
+        "seed": {
+          "type": "object",
+          "description": "seed 的加密分片（KDF：口令派生密钥加密），仅存在于可携带包/本机密钥区",
+          "properties": {
+            "encrypted_shard": { "type": "string" },
+            "kdf": { "type": "string", "description": "KDF 算法标识，如 argon2id" },
+            "salt": { "type": "string" }
+          }
+        }
+      }
+    },
+
+    "persona": {
+      "$ref": "#/$defs/persona"
+    },
+
+    "memory": {
+      "type": "object",
+      "description": "记忆系统。log 为追加式事件日志；indexes 是派生索引视图，不进入可携带包（导入时重建）。",
+      "required": ["log"],
+      "properties": {
+        "log": {
+          "type": "object",
+          "description": "追加式事件日志段：数组按 seq 连续，跨段/跨设备由 HLC 合并",
+          "properties": {
+            "entries": { "type": "array", "items": { "$ref": "#/$defs/logEntry" } }
+          }
+        },
+        "indexes": {
+          "type": "object",
+          "description": "派生索引（图谱/向量/时间线），不打包",
+          "properties": {}
+        }
+      }
+    },
+
+    "capability": {
+      "type": "object",
+      "description": "能力层清单：可热更新。",
+      "properties": {
+        "base_model": { "type": "string", "description": "底座模型指针（品牌中立标识）" },
+        "persona_calibration": { "type": "string", "description": "persona 校准包版本号" },
+        "runtime_profile": { "enum": ["local", "hybrid", "cloud"], "description": "能力档位：全本地/混合/纯云端（前期实现以 cloud 为主，接口层保留 local）" },
+        "face_change_limit": { "type": ["integer", "null"], "description": "每月可更换面容次数上限；null/0 = 不限（智能体端用户可配置）" },
+        "skills": { "type": "array", "items": { "type": "string" } },
+        "exemplar_bank": { "type": "array", "items": { "$ref": "#/$defs/exemplar" } },
+        "device_permissions": {
+          "type": "object",
+          "description": "设备操作权限：应用级白名单 + 确认策略；trusted=最高权限（信任模式），开启前须经警告授权提示",
+          "properties": {
+            "trusted": { "type": "boolean", "description": "最高权限：任意移动、任意打开与操作（须警告授权提示后开启）" },
+            "apps": {
+              "type": "object",
+              "description": "应用级授权白名单：app 标识 → 授权档位与确认策略",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "level": { "enum": ["observe", "suggest", "execute", "high_risk"] },
+                  "confirm_policy": { "enum": ["auto", "ask_each", "ask_batch", "ask_always"] }
+                }
+              }
+            }
+          }
+        },
+        "facets": { "type": "array", "items": { "type": "string" }, "description": "领域侧面注册表" }
+      }
+    },
+
+    "assets": {
+      "type": "object",
+      "description": "资产：形象参数、衣柜库存、媒体附件",
+      "properties": {
+        "appearance": { "type": "object", "description": "形象参数（身份层 + 魅力成长层）+ 造型装扮" },
+        "wardrobe": { "type": "array", "items": { "type": "string" }, "description": "衣柜库存资产 ID 列表" },
+        "media": { "type": "array", "items": { "type": "string" }, "description": "记忆附件引用" }
+      }
+    },
+
+    "life": {
+      "type": "object",
+      "required": ["birth_anchor"],
+      "properties": {
+        "birth_anchor": { "type": "string", "format": "date-time", "description": "出生时间锚点；age = now − birth_anchor" },
+        "milestones": {
+          "type": "array",
+          "description": "里程碑（已触发/待触发队列）",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "at_age": { "type": "number", "description": "触发年龄（天）" },
+              "status": { "enum": ["pending", "triggered", "done"] }
+            }
+          }
+        }
+      }
+    },
+
+    "social": {
+      "type": "object",
+      "description": "社交层（Phase 6 逐步启用）",
+      "properties": {
+        "identity_key": { "type": "string", "description": "公钥身份（seed 派生，可寻址 ID）" },
+        "graph": { "type": "array", "description": "关系契约列表（双签哈希互认）", "items": { "type": "object" } },
+        "disclosure_policy": {
+          "type": "object",
+          "properties": {
+            "levels": {
+              "type": "object",
+              "description": "隐私分级：public / friend / partner / never",
+              "additionalProperties": { "type": "array", "items": { "type": "string" } }
+            },
+            "default": { "enum": ["minimal"] }
+          }
+        },
+        "shared_partitions": { "type": "array", "description": "共享记忆：联合索引视图引用", "items": { "type": "string" } },
+        "shared_artifacts": { "type": "array", "description": "合影/礼物等双源资产引用", "items": { "type": "string" } }
+      }
+    }
+  },
+
+  "$defs": {
+    "persona": {
+      "type": "object",
+      "description": "人格宪法（版本化；演进只走 persona_upgrade 里程碑）",
+      "required": ["version", "core", "voice"],
+      "properties": {
+        "version": { "type": "integer" },
+        "core": {
+          "type": "object",
+          "properties": {
+            "traits": {
+              "type": "object",
+              "description": "性格特质 0~1",
+              "additionalProperties": { "type": "number", "minimum": 0, "maximum": 1 }
+            },
+            "values": { "type": "array", "items": { "$ref": "#/$defs/weightedText" } },
+            "boundaries": { "type": "array", "items": { "type": "string" } },
+            "attachment_style": { "type": "string" }
+          }
+        },
+        "voice": {
+          "type": "object",
+          "properties": {
+            "sentence_length": { "enum": ["short", "medium", "long"] },
+            "formality": { "type": "number", "minimum": 0, "maximum": 1 },
+            "emoji": { "type": "number", "minimum": 0, "maximum": 1 },
+            "address": { "type": "string" }
+          }
+        },
+        "relationship": {
+          "type": "object",
+          "properties": {
+            "stage": { "enum": ["stranger", "familiar", "close", "deep"] },
+            "intimacy": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        },
+        "evolution": { "type": "object", "properties": { "next_upgrade_at": { "type": "string" } } }
+      }
+    },
+    "weightedText": {
+      "type": "object",
+      "required": ["text", "weight"],
+      "properties": {
+        "text": { "type": "string" },
+        "weight": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "exemplar": {
+      "type": "object",
+      "required": ["user", "assistant"],
+      "properties": {
+        "user": { "type": "string" },
+        "assistant": { "type": "string" },
+        "score": { "type": "number", "description": "用户打分/质量分" }
+      }
+    },
+    "logEntry": {
+      "type": "object",
+      "required": ["seq", "hlc", "prev_hash", "author", "type", "sig"],
+      "properties": {
+        "seq": { "type": "integer" },
+        "id": { "type": "string", "description": "稳定条目身份（创建时生成，收敛重写保留；跨链合并去重依据）" },
+        "hlc": {
+          "type": "object",
+          "required": ["t", "c"],
+          "properties": {
+            "t": { "type": "integer", "description": "物理时间（ms）" },
+            "c": { "type": "integer", "description": "逻辑计数" }
+          }
+        },
+        "prev_hash": { "type": "string" },
+        "author": { "enum": ["user", "companion", "system"] },
+        "type": {
+          "enum": [
+            "binding", "memory_append", "memory_correct", "memory_delete",
+            "persona_upgrade", "milestone", "state_change", "asset_change",
+            "social_link", "social_message", "joint_event", "gift",
+            "device_action", "tool_action", "approval", "capability_upgrade",
+            "screen_capture", "memory_export", "planner_plan", "planner_step"
+          ]
+        },
+        "target": { "type": ["string", "null"], "description": "被引用条目（纠正/墓碑指向）" },
+        "payload": { "type": "object" },
+        "sig": { "type": "string" }
+      }
+    }
+  }
+}

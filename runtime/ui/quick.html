@@ -1,0 +1,349 @@
+<!doctype html>
+<!-- Quick 意图入口(⌥Space/点击 TA 唤起,说完即隐)
+     quickSubmit 流式 + 语音播报 + Esc 收起 + prefill;夜玻璃面板 + 最近意图(5 条可清空)
+     + 任务进度(Working 重唤可见,同 Home 同状态)+ 长任务可停 + 完成自动收起。 -->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title data-i18n="quick.page.1">对 TA 说</title>
+<link rel="stylesheet" href="./ui.css">
+<style>
+  html, body { background: transparent; overflow: hidden; }
+  .shell { width: 100vw; height: 100vh; display: flex; align-items: flex-start; justify-content: center; }
+  .panel {
+    margin-top: 9vh; width: min(600px, 94vw);
+    background: var(--panel); backdrop-filter: blur(22px) saturate(1.2);
+    border: 1px solid var(--w-12);
+    border-radius: 20px; box-shadow: 0 30px 80px var(--scrim-50), inset 0 1px 0 var(--w-08);
+    padding: 18px 20px 12px; color: var(--white);
+    animation: rise var(--dur) var(--ease);
+    /* 面板整体可按住拖动;输入框/按钮/列表等交互元素在下方各自 no-drag */
+    position: relative;
+    -webkit-app-region: drag;
+  }
+  .panel input, .panel button, .qk-it, .reply { -webkit-app-region: no-drag; }
+  .qk-h { display: flex; align-items: center; gap: 10px; font-size: 15px; letter-spacing: 1px; margin-bottom: 12px; }
+  .qk-h .sp { margin-left: auto; margin-right: 32px; font-size: 11px; color: var(--ink-inv2); border: 1px solid var(--w-20); border-radius: 6px; padding: 3px 9px; }
+  /* 显式关闭钮——Esc 依赖焦点,焦点丢了就「关不了」;✕ 任何时刻可点 */
+  .qk-x {
+    position: absolute; top: 12px; right: 12px; width: 24px; height: 24px;
+    border: none; border-radius: 50%; cursor: pointer; -webkit-app-region: no-drag;
+    background: var(--w-08); color: var(--w-65); font-size: 11px; line-height: 1;
+    transition: background var(--dur-fast), color var(--dur-fast);
+  }
+  .qk-x:hover { background: var(--w-18); color: var(--white); }
+  /* 命中区扩展：24px 的圆钮视觉不变，可点区域 ≥40×40。
+     它本来就是 absolute（自带定位上下文），不用再加 position: relative。 */
+  .qk-x::after { content: ''; position: absolute; inset: -9px; }
+  /* 聊天入口直达——家/管理中心/我的 TA(lite 纯输入条形态也保留) */
+  .entries { display: flex; gap: 8px; margin-top: 10px; }
+  .ent {
+    flex: 1; height: 34px; border-radius: 10px; cursor: pointer; -webkit-app-region: no-drag;
+    border: 1px solid var(--pri-lite-a28); background: var(--w-06);
+    color: var(--w-85); font-size: 12.5px; letter-spacing: .5px;
+    transition: background var(--dur-fast), border-color var(--dur-fast), color var(--dur-fast);
+  }
+  .ent:hover { background: var(--pri-a30b); border-color: var(--pri-lite-a50); color: var(--white); }
+  .input-row { display: flex; gap: 10px; align-items: center; }
+  .input-row input {
+    flex: 1; background: var(--w-08); border: 1px solid var(--pri-lite-a40);
+    border-radius: var(--radius-input); color: var(--white); font-size: 12.5px; padding: 12px 16px; outline: none; min-width: 0;
+    transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+  }
+  .input-row input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .input-row input::placeholder { color: var(--w-55); }
+  .send { width: 44px; height: 44px; border-radius: 13px; background: var(--grad); color: var(--white); font-size: 15px; flex: none;
+    box-shadow: 0 4px 12px var(--glow); transition: transform var(--dur-fast) var(--ease); }
+  .send:hover { transform: translateY(-1px); }
+  .send.stop { background: var(--danger); box-shadow: 0 4px 12px var(--rose-a40); }
+  .mic { width: 40px; height: 44px; border: none; background: none; color: var(--w-60); font-size: 17px; flex: none;
+    cursor: pointer; border-radius: 11px; transition: background var(--dur-fast), color var(--dur-fast); }
+  .mic:hover { background: var(--w-08); color: var(--white); }
+  /* lite 模式(单击 TA 说话):纯输入条形态——隐藏标题/意图/任务/提示,只留「和 TA 说点什么… 🎙 ↑」 */
+  body.lite .qk-h, body.lite .intents, body.lite .taskbox, body.lite .hint { display: none !important; }
+  body.lite .shell { align-items: flex-start; }
+  body.lite .panel {
+    margin: 12px 12px 0; width: calc(100% - 24px); padding: 30px 12px 10px;
+    background: var(--night-55b);
+    backdrop-filter: blur(24px) saturate(1.25); -webkit-backdrop-filter: blur(24px) saturate(1.25);
+    border: 1px solid var(--pri-lite-a20b);
+    border-radius: 22px;
+    box-shadow: 0 10px 30px var(--scrim-22), inset 0 1px 0 var(--w-08);
+  }
+  body.lite .qk-x { top: 6px; right: 10px; }
+  body.lite .entries { margin-top: 8px; }
+  body.lite .input-row input { height: 46px; }
+  body.lite .reply { margin-top: 6px; font-size: 12.5px; max-height: 52px; }
+  /* 最近意图(本地持久化,≤5 条,可清空) */
+  .intents { margin-top: 6px; }
+  .intents-h { display: flex; align-items: baseline; font-size: 11px; color: var(--ink-inv2); letter-spacing: 1px; margin: 8px 2px 2px; }
+  .intents-h .clr { margin-left: auto; cursor: pointer; border: none; background: none; color: var(--ink-inv2); font-size: 11px; padding: 2px 6px; border-radius: 6px; }
+  .intents-h .clr:hover { color: var(--white); background: var(--w-08); }
+  .qk-it { display: flex; align-items: center; gap: 11px; padding: 9px 11px; border-radius: 11px; font-size: 12.5px;
+    color: var(--w-85); cursor: pointer; transition: background var(--dur-fast); }
+  .qk-it:hover { background: var(--w-07); }
+  .qk-it .ic { width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 15px; background: var(--pri-a25); flex: none; }
+  .qk-it .tx { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* 任务进度(Working 重唤可见)/回复流式 */
+  .taskbox { margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: var(--w-06); font-size: 12.5px; line-height: 1.6; color: var(--w-90); }
+  .taskbox .prog { background: var(--w-12); }
+  .reply { margin-top: 10px; font-size: 15px; line-height: 1.7; color: var(--quick-ink); min-height: 1.2em; white-space: pre-wrap; max-height: 38vh; overflow-y: auto; }
+  .reply .cursor { display: inline-block; width: 2px; height: 1em; background: var(--quick-caret); vertical-align: -2px; animation: blinkc .8s infinite; }
+  @keyframes blinkc { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+  .hint { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--w-10); font-size: 11px; color: var(--ink-inv2); display: flex; gap: 12px; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+  <div class="shell">
+    <div class="panel">
+      <div class="qk-h"><span data-i18n="quick.head">✨ 快捷入口</span> <span class="sp">⌥ Space</span></div>
+      <button class="qk-x" id="qk-x" title="收起(Esc)" data-i18n-title="quick.qk-x.1">✕</button>
+      <div class="input-row">
+        <input id="input" placeholder="你想让我做什么?(Esc 收起,回车发送)" autofocus data-i18n-placeholder="quick.input.1">
+        <button class="mic" id="mic" title="语音输入" data-i18n-title="quick.mic.1"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg></button>
+        <button class="send" id="send" title="告诉她" data-i18n-title="quick.send.1">➤</button>
+      </div>
+      <div class="entries">
+        <!-- 两入口；「管理中心」是高级设置，
+             改从「个性化 → 高级设置」进。名字由 JS 填成她的名字（没取名回落「TA」）。 -->
+        <button class="ent" id="ent-home" title="她的家：今日、聊天记录、记忆" data-i18n-title="quick.ent-home.1" data-i18n="quick.ent-home.2">🏠 TA 的家</button>
+        <button class="ent" id="ent-me" title="个性化：人格、声音、外观、记忆" data-i18n-title="quick.ent-me.1" data-i18n="quick.ent-me.2">👤 个性化</button>
+      </div>
+      <div class="intents hidden" id="intents-box">
+        <div class="intents-h">最近想做的事 <button class="clr" id="intents-clr" data-i18n="quick.intents-clr.1">清空</button></div>
+        <div id="intents"></div>
+      </div>
+      <div class="taskbox hidden" id="taskbox"></div>
+      <div class="reply" id="reply"></div>
+      <div class="hint"><span data-i18n="quick.hint.1">回车发送</span><span data-i18n="quick.hint.2">Esc 收起</span><span id="status" data-i18n="quick.status.1">TA 在听</span></div>
+    </div>
+  </div>
+
+<script src="./state-words.js"></script>
+<script src="./i18n.js"></script>
+<script src="./components.js"></script>
+<script>
+'use strict';
+const $ = (id) => document.getElementById(id);
+const input = $('input');
+const send = $('send');
+const reply = $('reply');
+const statusEl = $('status');
+
+/* ---------- 最近意图(本地持久化;上限 5,可清空;点击即发送) ---------- */
+const ICONS = [
+  [/分析|数据|报告|报表/, '📊'], [/文件|pdf|PDF|文档|docx?|xlsx?/, '📂'], [/翻译|译/, '🌐'],
+  [/总结|摘要|要点/, '📝'], [/写|起草|文案|邮件/, '✍️'], [/想|思考|头脑风暴/, '💡'], [/整理|清理|归档/, '🗂'],
+];
+const iconFor = (t) => (ICONS.find(([re]) => re.test(t))?.[1] ?? '✨');
+async function getIntents() {
+  const r = await window.api.recentIntents().catch(() => null);
+  return r?.ok ? r.items : [];
+}
+async function saveIntent(text) {
+  const cur = await getIntents();
+  const next = [text, ...cur.filter((t) => t !== text)].slice(0, 5);
+  await window.api.recentIntents(next).catch(() => {});
+  renderIntents(next);
+}
+async function renderIntents(list) {
+  const items = list ?? await getIntents();
+  const box = $('intents');
+  box.innerHTML = '';
+  $('intents-box').classList.toggle('hidden', !items.length);
+  for (const t of items) {
+    box.append(UI2.h('div', { class: 'qk-it', onclick: () => { input.value = t; submit(); } }, [
+      UI2.h('span', { class: 'ic', text: iconFor(t) }),
+      UI2.h('span', { class: 'tx', text: t }),
+    ]));
+  }
+}
+$('intents-clr').addEventListener('click', async () => {
+  await window.api.recentIntents([]).catch(() => {});
+  $('intents-box').classList.add('hidden');
+});
+/* 🎙 语音输入:诚实引导(系统听写),不做假语音 */
+$('mic').addEventListener('click', () => {
+  UI2.Toast(DT('quick.js.toast.1', '连按两下 Fn 键用系统听写说话,说完像打字一样发送'), '');
+  $('input').focus();
+});
+renderIntents();
+
+/* ---------- 聊天入口直达——家/管理中心/我的 TA,不用打字绕 LLM ---------- */
+$('qk-x').addEventListener('click', () => window.api.quickHide());
+$('ent-home').addEventListener('click', () => { window.api.homeOpen(); window.api.quickHide(); });
+$('ent-me').addEventListener('click', () => { window.api.meOpen('home'); window.api.quickHide(); });
+// 入口上的名字跟着她走（没取名 → 「TA」）
+window.api.petProfile?.().then((p) => {
+  const nm = p?.selections?.name || 'TA';
+  const home = $('ent-home');
+  if (home) home.textContent = DT('quick.js.tpl.1', '🏠 {p1}的家', { p1: nm });
+}).catch(() => { /* 出生包还没就绪 → 先留着「TA 的家」 */ });
+
+/* ---------- 任务进度(Working 重唤可见;同 Home 同状态,广播已通) ---------- */
+let taskBusy = false;
+function renderTask(ev) {
+  const st = ev?.to ?? ev?.state;
+  const detail = ev?.detail ?? null;
+  taskBusy = (globalThis.TaskWords?.BUSY_STATES ?? []).includes(st);
+  const box = $('taskbox');
+  if (!taskBusy) { box.classList.add('hidden'); return; }
+  box.classList.remove('hidden');
+  box.innerHTML = '';
+  // 状态词/活动态集合都取自唯一真源（ui/state-words.js），页面不再自己写表
+  box.append(UI2.StatePill({ state: st, detail: st === 'Working' && ev?.step ? ev.step : detail }));
+  if (st === 'Working') box.append(UI2.h('div', { class: 'prog', style: { marginTop: '8px' } }, [UI2.h('i', { style: { width: '42%' } })]));
+  setSendShape();
+}
+window.api.onTaskState?.(renderTask);
+window.api.taskStateGet?.().then((r) => { if (r?.ok) renderTask({ state: r.state, word: r.word, pending: r.pending }); }).catch(() => {});
+// 重唤(隐藏→显示)时同步当前任务态,Working 进度立即可见
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    window.api.taskStateGet?.().then((r) => { if (r?.ok) renderTask({ state: r.state, word: r.word, pending: r.pending }); }).catch(() => {});
+    renderIntents();
+  }
+});
+
+/* ---------- 提交/流式/停止 ---------- */
+let speaking = false;
+let acc = '';
+let busy = false;
+let stopped = false;
+const cur = document.createElement('span');
+cur.className = 'cursor';
+window.api.onQuickDelta((delta) => {
+  acc += delta;
+  reply.textContent = acc;
+  reply.appendChild(cur);
+});
+
+function setSendShape() {
+  const stop = busy || taskBusy;
+  send.textContent = stop ? '■' : (document.body.classList.contains('lite') ? '↑' : '➤');
+  send.classList.toggle('stop', stop);
+  send.title = stop ? '停一下' : '告诉她';
+  send.disabled = false;
+}
+setSendShape();
+
+/* lite 模式:单击 TA 说话=纯输入条;⌥Space=完整意图入口。窗可复用,模式随唤起来源切换 */
+let liteMode = new URLSearchParams(location.search).get('mode') === 'lite';
+function applyMode(m) {
+  liteMode = m === 'lite';
+  document.body.classList.toggle('lite', liteMode);
+  input.placeholder = liteMode ? '和 TA 说点什么…' : '你想让我做什么?(Esc 收起,回车发送)';
+  setSendShape();
+}
+applyMode(liteMode ? 'lite' : 'full');
+window.api.onQuickMode?.(applyMode);
+
+const EMOTION_VOICE = {
+  comfort: { pitch: 1.12, rate: 0.97 },
+  knowledge: { pitch: 1.0, rate: 1.06 },
+  neutral: { pitch: 1.05, rate: 1.03 },
+};
+function speak(text, emotion = 'neutral') {
+  if (!('speechSynthesis' in window) || !text) { scheduleHide(2000); return; }
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'zh-CN';
+  const v = EMOTION_VOICE[emotion] ?? EMOTION_VOICE.neutral;
+  u.pitch = 1.08 * v.pitch;
+  u.rate = v.rate;
+  const zh = speechSynthesis.getVoices().find((x) => x.lang.startsWith('zh'));
+  if (zh) u.voice = zh;
+  speaking = true;
+  statusEl.textContent = 'TA 在说…';
+  const done = () => {
+    speaking = false;
+    statusEl.textContent = 'TA 在听';
+    window.api.quickHide(); // 完成(含播报结束)自动收起;结果已入今日记录
+  };
+  u.onend = done;
+  u.onerror = done;
+  speechSynthesis.cancel();
+  speechSynthesis.speak(u);
+  // 播报静默失败兜底(引擎存在但没真正发声):900ms 后仍未开播 → 兜底收起,窗口不残留
+  setTimeout(() => {
+    if (!speechSynthesis.speaking && !speechSynthesis.pending) scheduleHide(600);
+  }, 900);
+}
+function scheduleHide(ms) { setTimeout(() => { if (!busy && !taskBusy) window.api.quickHide(); }, ms); }
+
+const submit = async () => {
+  const text = input.value.trim();
+  if (!text) return;
+  if (busy) {
+    // TA 在忙——快速气泡不做两档选择，这句话直接作插话送进去
+    input.value = '';
+    // 带上当前回合 id 做预条件校验——不然"打到已经结束的那一轮"会没声没息地丢
+    const at = await window.api.chatActiveTurn?.().catch(() => null);
+    const sr = await window.api.chatSteer(text, at?.turnId ?? null).catch(() => null);
+    if (sr?.reason === 'no-active-turn') { busy = false; setSendShape(); return submit(); } // 刚好忙完 → 正常发
+    reply.textContent = sr?.ok ? '（已插话——TA 马上会看到）' : '（没送出去，稍后再试）';
+    return;
+  }
+  input.value = '';
+  busy = true;
+  stopped = false;
+  setSendShape();
+  acc = '';
+  reply.textContent = '';
+  reply.appendChild(cur);
+  saveIntent(text);
+  try {
+    const r = await window.api.quickSubmit(text);
+    reply.textContent = r.ok ? r.reply : DT('quick.js.tpl.2', '这次没完成:{p1}', { p1: r.reply || r.error || '出了点问题' });
+    if (r.ok) {
+      renderExpand();
+      speak(r.reply, r.emotion ?? 'neutral');
+    } else scheduleHide(2600);
+  } catch (e) {
+    reply.textContent = DT('quick.js.tpl.3', '这次没完成:{p1}', { p1: e.message });
+    scheduleHide(2600);
+  } finally {
+    busy = false;
+    setSendShape();
+  }
+};
+/* 聊天三级:Level2 长聊入口——「展开对话」进入对话房间(空气感浮层);历史归 Home/我的 TA */
+let expandEl = null;
+function renderExpand() {
+  if (expandEl) expandEl.remove();
+  expandEl = UI2.h('div', {
+    style: { marginTop: '8px', fontSize: '11px', color: 'var(--w-55)', cursor: 'pointer', textAlign: 'center', WebkitAppRegion: 'no-drag' },
+    onclick: () => { window.api.convOpen(); window.api.quickHide(); },
+  }, '想继续聊?展开对话 ›');
+  reply.after(expandEl);
+}
+/* 「聊聊/陪陪我」→ TA 邀请「找个舒服的地方聊」(一键进房间) */
+window.api.onConvInvite?.(() => {
+  if ($('invite')) return;
+  const bar = UI2.h('div', {
+    id: 'invite',
+    style: { marginTop: '8px', fontSize: '12px', color: 'var(--white)', cursor: 'pointer', textAlign: 'center',
+      padding: '8px 10px', borderRadius: '12px', background: 'var(--pri-a28b)', WebkitAppRegion: 'no-drag' },
+    onclick: () => { window.api.convOpen(); window.api.quickHide(); },
+  }, 'TA:想找个舒服的地方聊？进对话房间 ›');
+  reply.after(bar);
+  setTimeout(() => bar.remove(), 15000); // 15s 未理会自动消失
+});
+send.addEventListener('click', () => {
+  if (busy || taskBusy) { stopped = true; window.api.chatStop(); return; }
+  submit();
+});
+input.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); submit(); }
+  if (e.key === 'Escape') window.api.quickHide();
+});
+window.addEventListener('keydown', (e) => { if (e.key === 'Escape') window.api.quickHide(); });
+
+// 处理文件链路:启动参数/事件预填指令
+const applyPrefill = (t) => { if (t) { input.value = String(t); input.focus(); } };
+applyPrefill(new URLSearchParams(location.search).get('prefill'));
+window.api.onQuickPrefill(applyPrefill);
+input.focus();
+</script>
+</body>
+</html>

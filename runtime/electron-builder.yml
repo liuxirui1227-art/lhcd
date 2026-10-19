@@ -1,0 +1,41 @@
+# 010-9：灵核 macOS 打包配置（electron-builder）
+# 产物：dist/mac/灵核.app（ad-hoc 签名——本机开发轮；正式分发需 Apple Developer ID 签名，见备忘）
+# 011-B1（用户安装问题）：identity "-" = ad-hoc 签名——未签名 app 的子进程（GPU/网络/渲染）
+# 在 macOS 26 下被系统拒绝（ICU fd 传递失败 + GPU crash 循环 + FATAL 退出）→ 窗口永不显示
+appId: com.lhcd.ta
+productName: lhcd
+# 直接用本机已安装的 Electron.app（node_modules/electron/dist，33.4.11）——
+# 跳过 electron-builder 的 zip 下载+解包（该步在本机直连/代理下均卡死，见坑记录）
+electronDist: node_modules/electron/dist
+directories:
+  app: build/stage
+  output: dist
+files:
+  - "**/*"
+  # 迭代 06：pdf-parse 是**唯一**真运行时依赖（pdfjs 要按路径加载独立 worker，压不进 bundle）。
+  # 下面几条把用不到的分支剔掉——留 legacy build（我们实际 import 的那份）+ cmaps（中文 PDF 抽字）
+  # + standard_fonts；modern build / 浏览器版 / 类型声明 / sourcemap 都不要。
+  - "!**/*.map"
+  - "!node_modules/pdfjs-dist/build/**"
+  - "!node_modules/pdfjs-dist/web/**"
+  - "!node_modules/pdfjs-dist/types/**"
+  - "!node_modules/pdfjs-dist/image_decoders/**"
+asar: true
+mac:
+  # 只出 .app（dir 目标）；dmg 由 build-dmg.mjs 用 hdiutil 自打——
+  # electron-builder 的 dmg 目标会下载 dmgbuild-bundle 二进制，本机网络下该下载完成即挂（坑记录）
+  target: dir
+  category: public.app-category.entertainment
+  icon: build/icon.icns
+  # 011-B1：ad-hoc 签名（"-"）——electron-builder 按正确顺序签 Framework/Helper/主程序，
+  # 修复「安装后打不开」（未签名子进程被 macOS 26 拒绝）+ Launchpad 不注册问题
+  identity: "-"
+  # ad-hoc 开发轮关掉 hardenedRuntime：硬运行时开库验证会挡内部 Framework 且需额外 entitlement
+  hardenedRuntime: false
+  darkModeSupport: true
+  # 2026-09-27 修（用户实测：中文 Mac 上界面显示英文）：**必须声明本地化**。
+  # 打包出来的 bundle 里没有 .lproj、也没有 CFBundleLocalizations 时，Chromium 取不到应用本地化
+  # → app.getLocale() 回落 en-US（中文系统上也一样）→ 界面按英文渲染，跟没搬完的中文混排。
+  extendInfo:
+    CFBundleDevelopmentRegion: zh_CN
+    CFBundleLocalizations: [zh_Hans, zh_Hant, en, ja, ko]

@@ -1,0 +1,1617 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>TA</title>
+  <link rel="stylesheet" href="./overlay-tokens.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    [hidden] { display: none !important; } /* 防止 .actor img{display:block} 等作者 CSS 覆盖 hidden 属性 */
+    html, body { height: 100%; background: transparent; overflow: hidden; }
+    #pet { position: relative; width: 100%; height: 100%; }
+
+    /* 角色容器：自由行走/拖拽的主体 */
+    #wrap {
+      position: absolute; left: 0; top: 0;
+      display: flex; flex-direction: column; align-items: center;
+      user-select: none; will-change: left, top;
+    }
+    /* ---- TA 气泡（深玻璃）----
+       小尖尾巴用 clip-path 贴在气泡下沿之外（不重叠——半透明底重叠会叠成更深的补丁）；
+       阴影为近实远虚两层；圆角统一 18；字号 13 / 行高 1.65 / 内边距 12。 */
+    .bubble {
+      margin-bottom: 10px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(14px) saturate(1.25); -webkit-backdrop-filter: blur(14px) saturate(1.25);
+      color: var(--glass-ink); font-size: 13px; letter-spacing: .2px;
+      line-height: 1.65; padding: 12px 16px; border-radius: 18px; max-width: 320px;
+      white-space: pre-wrap;
+      box-shadow: 0 10px 30px -8px var(--scrim-50), 0 2px 8px var(--scrim-35), inset 0 1px 0 var(--w-12);
+      border: 1px solid var(--glass-line);
+      position: relative;
+      animation: bubbleRise .3s var(--tt-ease, ease);
+    }
+    .bubble::after {
+      content: ''; position: absolute; left: 22px; bottom: -8px;
+      width: 15px; height: 9px;
+      background: var(--glass-bg);
+      clip-path: polygon(0 0, 100% 0, 10% 100%);
+    }
+    .bubble code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px;
+      background: var(--w-12); border-radius: 5px; padding: 0 4px; }
+    .bubble strong { font-weight: 600; color: var(--white); }
+    /* 情绪着色：喜悦**整颗带出品牌紫**，嗔怪/安抚仍是描边着色——
+       一档"整颗变色"、两档"描边"：越开心越显眼。 */
+    .bubble.joy { background: var(--bubble-joy-bg); border-color: var(--bubble-joy-line); }
+    .bubble.joy::after { background: var(--bubble-joy-tail); }
+    .bubble.angry { border-color: var(--bubble-angry-line); }
+    .bubble.comfort { border-color: var(--bubble-comfort-line); }
+    @keyframes bubbleRise { from { opacity: 0; transform: translateY(6px) scale(.96); } }
+
+    /* ---- 审批气泡（TA 想执行：xxx [允许][拒绝]，玻璃态与面板一致） ---- */
+    #approvalCard {
+      margin-bottom: 6px; max-width: 320px;
+      background: var(--glass-94); color: var(--on-glass-0); font-size: 12.5px;
+      line-height: 1.6; padding: 12px 14px; border-radius: 14px;
+      box-shadow: 0 8px 22px var(--scrim-40);
+      border: 1px solid var(--pri-a40);
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    #approvalCard[hidden] { display: none; }
+    #approvalCard .ap-title { opacity: 0.75; font-size: 12.5px; }
+    #approvalCard .ap-risk { font-size: 11px; padding: 2px 8px; border-radius: 999px; margin-left: 4px; }
+    #approvalCard .ap-risk.r-high { background: var(--err-a18); color: var(--err-soft); }
+    #approvalCard .ap-risk.r-mid { background: var(--gold-a16); color: var(--gold-on-glass); }
+    #approvalCard .ap-risk.r-low { background: var(--ok-a16); color: var(--ok-mint-2); }
+    /* R5（任意脚本，任何档位都必须问）：给一道更醒目的边——不是"更吓人"，是"这一档不可逆" */
+    #approvalCard .ap-risk.r-mandatory { box-shadow: 0 0 0 1px var(--err-a55); }
+    #approvalCard .ap-cmd {
+      font-family: inherit; font-size: 12.5px; line-height: 1.7;
+      white-space: pre-wrap; word-break: break-all; max-height: 96px; overflow-y: auto;
+    }
+    #approvalCard .ap-actions { display: flex; gap: 8px; }
+    #approvalCard .ap-btn {
+      flex: 1; border: none; cursor: pointer; border-radius: 10px; padding: 7px 0;
+      font-size: 12.5px; transition: all .15s;
+    }
+    #approvalCard .ap-btn.allow { background: var(--allow); color: var(--white); }
+    #approvalCard .ap-btn.allow:hover { background: var(--allow-hover); transform: translateY(-1px); }
+    #approvalCard .ap-btn.deny { background: var(--deny); color: var(--white); }
+    #approvalCard .ap-btn.deny:hover { background: var(--deny-hover); transform: translateY(-1px); }
+    /* 为什么问你 / 影响面 / 原始命令折叠 / 第二行按钮 */
+    #approvalCard .ap-why { font-size: 12px; line-height: 1.7; color: var(--on-glass-2); }
+    #approvalCard .ap-imp { font-size: 11px; line-height: 1.7; color: var(--on-glass-4); }
+    #approvalCard .ap-rawt { align-self: flex-start; padding: 0; border: none; background: none;
+      color: var(--on-glass-5); font-size: 11px; cursor: pointer; font-family: inherit; }
+    #approvalCard .ap-rawt:hover { color: var(--on-glass-2); }
+    #approvalCard .ap-btn.session { background: var(--w-09); color: var(--on-glass-2); font-size: 11.5px; padding: 6px 0; }
+    #approvalCard .ap-rule { font-size: 11px; color: var(--on-glass-6); line-height: 1.6; margin-top: 7px;
+      padding: 6px 8px; border-radius: 6px; background: var(--w-06); }
+
+    /* ---- 数字人身上的交互层（悬停提示 / 双击图标面板 / 动作面板） ---- */
+    #wrap.hovered { cursor: pointer; }
+    :root {
+      --tt-ease: cubic-bezier(.25,.8,.3,1);
+      /* 深玻璃家族（气泡/环绕菜单/任务条共用同一条视觉语言）。
+         本页不引 ui.css；`--white/--glass-bg/--glass-line/--glass-ink` 由 `overlay-tokens.css`
+         供给（生成物，值同 ui.css），本块只留本页自己的别名。任务条用色一律从这里取，别处不再散写。
+         ⚠ 顺序纪律：先做替换、后写定义——反过来会替换掉定义本身。
+         ⚠ 写成 `--x: var(--x)` 即自我引用（保证无效值），会让这一族颜色整片失效。 */
+      --glass-shadow: var(--scrim-38);
+      --accent-soft: var(--glass-accent);
+    }
+    /* 键盘焦点可见：本页不引 ui.css，先就地声明；接入 ui.css 后删掉这条 */
+    :focus-visible { outline: 2px solid var(--violet); outline-offset: 2px; border-radius: 6px; }
+
+    /* ---- 环绕菜单动画（iconPanel 定位规则见下方环绕段） ---- */
+    @keyframes iconPanelPop {
+      from { opacity: 0; transform: scale(.85); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    #iconPanel.closing {
+      animation: iconPanelClose .15s ease-in forwards;
+    }
+    @keyframes iconPanelClose {
+      to { opacity: 0; transform: scale(.9); }
+    }
+    /* ---- 环绕式行为菜单:小钮环绕 TA 本体中段(💬上 ✦左 🧠右 ☕下 ···右下),hover 浮出文字;
+       尺寸跟随 TA 缩放(--obsize 由 applyStageSize 设定) ---- */
+    #iconPanel {
+      position: absolute; inset: 0;               /* 覆盖=TA 本体宽高 */
+      z-index: 20;
+      animation: iconPanelPop .22s cubic-bezier(.2,.9,.3,1.3);
+      transform-origin: 50% 50%;
+      pointer-events: none;                       /* 容器不挡操作;只有小钮/子面板可点 */
+    }
+    #iconPanel[hidden] { display: none; }
+    /* 环上那条细弧：默认 28% 紫，指到任意一颗钮时亮到 55%。
+       它只是"看得出这是个环"，不参与命中（pointer-events:none）。 */
+    #ringLine { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
+    /* ⚠ 选到 `:is(path, ellipse)`：里面画的是 `<ellipse>`，只写 `path` 的话选择器不命中，
+       SVG 默认 `fill: black` 会把整圈填成实心黑（当场见过一次）。 */
+    #ringLine :is(path, ellipse) { fill: none; stroke: var(--pri-lite-a28); stroke-width: 1; stroke-dasharray: 3 6; }
+    #iconPanel:has(.orb-btn:hover) #ringLine :is(path, ellipse) { stroke: var(--pri-lite-a55); }
+    .orb-btn {
+      /* 定位 =「以形象中心为原点 + 按 H 的倍率偏移」，环落在本体之外：
+         上/下/左/右 = --ring-up/--ring-y/--ring-x。
+         ⚠ 钮摆到本体之外 ⇒ **溢出** #iconPanel（inset:0）——动半径时必须一并确认
+         `hitTest()` 还能命中每颗钮，否则鼠标移到外圈钮会被判 pet-leave → 整窗点击穿透。
+         描边 --pri-lite-a45、投影「近实远虚」两层、内高光 --w-18。 */
+      position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+      margin-left: var(--mx, 0px); margin-top: var(--my, 0px);
+      width: var(--obsize, 44px); height: var(--obsize, 44px); border-radius: 50%;
+      border: 1px solid var(--pri-lite-a45);
+      background: var(--night-72);
+      backdrop-filter: blur(14px) saturate(1.25); -webkit-backdrop-filter: blur(14px) saturate(1.25);
+      color: var(--white); font-size: calc(var(--obsize, 44px) * .42); cursor: pointer; pointer-events: auto;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 8px 24px -6px var(--scrim-50), 0 1px 3px var(--scrim-35), inset 0 1px 0 var(--w-18);
+      transition: transform .18s var(--tt-ease, ease), background .18s, box-shadow .18s;
+    }
+    .orb-btn:hover {
+      transform: translate(-50%, -50%) scale(1.08); background: var(--pri-a88);
+      box-shadow: 0 10px 28px -6px var(--pri-a60b), inset 0 1px 0 var(--w-30);
+    }
+    /* 四个钮的方位（上/左/右/下）——只动半径，不动方位；四个钮**围着她、但不压在她身上**。 */
+    /* 倍率只有一个来源：`--ring-x/--ring-y`（JS 在 applyStageSize 里设，clampRing 也读它）——
+       曾出现 CSS 改成 .36 而 clampRing 仍写 .63，环被错误地整体内移 64px。 */
+    /* ⚠ 上下**不对称**：她 1H 高、帽顶在中心上方 0.5H——上面那颗必须比左右/下面更远才让得开脸，
+       所以上钮用 --ring-up(.55H)，左右与下钮用 --ring-x/--ring-y。 */
+    /* ⚠ 半径用 `--ring-h`（**看得见的高度**）而不是 `--H`（舞台盒高）：模型是"拉满画布再放大 6%"，
+       盒子四周有透明边距——按盒子画，环就围着一团空气。
+       `--ring-cy` 是"看得见的她"的中心相对盒子中心的偏移（她脚踩盒底、透明边距都在上面 → 中心偏下）。 */
+    .orb-btn { top: calc(50% + var(--ring-cy, 0px)); }
+    .orb-btn[data-act="chat"] { --my: calc(var(--ring-h, var(--H, 300px)) * var(--ring-up, .55) * -1 + var(--ring-dy, 0px)); }
+    .orb-btn[data-act="work"] { --mx: calc(var(--ring-h, var(--H, 300px)) * var(--ring-x, .30) * -1 + var(--ring-dx, 0px)); }
+    .orb-btn[data-act="more"] { --mx: calc(var(--ring-h, var(--H, 300px)) * var(--ring-x, .30) + var(--ring-dx, 0px)); }
+    /* ⚠ 「陪我待会」固定在**正下方**（0, +0.30H）——它会压在腿/脚上，这是有意为之；
+       不要改成右下斜角或其它方位。 */
+    .orb-btn[data-act="stay"] { --my: calc(var(--ring-h, var(--H, 300px)) * var(--ring-y, .30) + var(--ring-dy, 0px)); }
+    /* 工作模式——✦ 变「工作台」并高亮（带进行中的呼吸点），☕ 置灰 */
+    .orb-btn.hot { background: var(--pri-a88); border-color: var(--pri-lite-a75); box-shadow: 0 8px 26px var(--pri-a55); }
+    .orb-btn .ob-num { position: absolute; right: -4px; bottom: -4px; width: 9px; height: 9px; border-radius: 50%;
+      background: var(--pri-lite-ink-2); box-shadow: 0 0 0 2px var(--night-80); animation: obPulse 1.6s ease-in-out infinite; }
+    @keyframes obPulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+    .orb-btn svg { width: 46%; height: 46%; display: block; }
+    .orb-btn .ob-label {
+      position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+      white-space: nowrap; font-size: 11px; letter-spacing: 1px; color: var(--white);
+      background: var(--night-88); border: 1px solid var(--pri-lite-a25);
+      padding: 4px 11px; border-radius: 999px;
+      opacity: 0; pointer-events: none; transition: opacity .18s;
+    }
+    .orb-btn:hover .ob-label { opacity: 1; }
+    /* 下面那颗的标签挂上方；右面那颗挂在下方（与左右其余钮一致） */
+    .orb-btn[data-act="stay"] .ob-label { top: auto; bottom: calc(100% + 6px); }
+    /* 旧横排图标行(保留样式引用兼容,不再使用) */
+    .icon-row {
+      display: flex; gap: 10px; padding: 12px 16px;
+      background: var(--night-55);
+      backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--w-12);
+      border-radius: 20px;
+      box-shadow: 0 12px 40px var(--scrim-50), inset 0 1px 0 var(--w-08);
+    }
+    .icon-btn {
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      width: 52px; height: 52px; border: none; cursor: pointer;
+      background: transparent; color: var(--w-85);
+      border-radius: 14px; transition: all .15s;
+      font-size: 22px; line-height: 1;
+    }
+    .icon-btn .label { font-size: 11px; opacity: 0.7; letter-spacing: 0.5px; }
+    .icon-btn:hover {
+      background: var(--pri-a35);
+      transform: translateY(-3px) scale(1.08);
+      box-shadow: 0 6px 18px var(--pri-a40c);
+      color: var(--white);
+    }
+    .icon-btn:active { transform: translateY(-1px) scale(1.02); }
+    .icon-btn.active { background: var(--pri-a50); color: var(--white); }
+
+    /* ---- 子面板（动作/换装/文件上传等，从图标面板展开） ---- */
+    .sub-panel {
+      position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%);
+      min-width: 180px; overflow-y: auto;   /* 上限由 positionSubPanel() 一处算（底部不许被裁） */
+      background: var(--night-92);
+      backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--pri-a40); border-radius: 16px;
+      padding: 8px; box-shadow: 0 18px 48px var(--scrim-60);
+      animation: pop .16s cubic-bezier(.2,.9,.3,1.2);
+      /* 「更多/帮我做事往下点不动」：pointer-events 是继承属性，
+         #iconPanel 容器的 none 会传给子面板 → 真鼠标点击全部穿透（合成 el.click() 测不出来）。
+         不补 auto = 整个子面板对鼠标透明。 */
+      pointer-events: auto;
+      z-index: 21;
+    }
+    .sub-panel.below { bottom: auto; top: calc(100% + 8px); }
+    @keyframes pop { from { opacity: 0; transform: translateX(-50%) scale(.92) translateY(4px); } }
+    .menu-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 9px 12px; font-size: 12.5px; color: var(--on-glass-1); border-radius: 10px;
+      cursor: pointer; white-space: nowrap;
+    }
+    .menu-item:hover { background: var(--pri-a28c); }
+    /* 点选大小**不关面板**，所以得看得出"现在选的是哪一档" */
+    .menu-item.on { background: var(--pri-a34); color: var(--white); box-shadow: inset 0 0 0 1px var(--pri-lite-a45); }
+    .menu-item.back { color: var(--on-glass-3); border-bottom: 1px dashed var(--w-12); margin-bottom: 4px; border-radius: 10px 10px 0 0; }
+    .menu-title { font-size: 11px; color: var(--on-glass-3); padding: 2px 12px 6px; }
+
+    /* ---- 帮我做事 = 2×2 操作按钮卡片(图标+标题+一句话说明,一眼知道干什么) ---- */
+    .sub-panel.wide { min-width: 330px; }
+    .act-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 2px 4px 6px; }
+    .act-card {
+      display: flex; flex-direction: column; align-items: flex-start; gap: 5px;
+      padding: 12px; border-radius: 14px; cursor: pointer; text-align: left;
+      border: 1px solid var(--pri-lite-a26); background: var(--w-05);
+      transition: background .15s, border-color .15s, transform .15s;
+    }
+    .act-card:hover { background: var(--pri-a30); border-color: var(--pri-lite-a55); transform: translateY(-2px); }
+    .act-card .ac-ic { font-size: 22px; line-height: 1; }
+    .act-card .ac-t { font-size: 12.5px; font-weight: 600; color: var(--white); letter-spacing: .5px; }
+    .act-card .ac-d { font-size: 11px; line-height: 1.55; color: var(--w-55); }
+
+    /* ---- 拖放文件覆盖层 ---- */
+    #dropOverlay {
+      position: absolute; inset: 0; z-index: 50;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--night-70);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      opacity: 0; pointer-events: none; transition: opacity .2s;
+    }
+    #dropOverlay.active { opacity: 1; pointer-events: all; }
+    .drop-card {
+      display: flex; flex-direction: column; align-items: center; gap: 14px;
+      padding: 36px 48px; border-radius: 24px;
+      background: var(--deep-85);
+      border: 2px dashed var(--pri-lite-a60);
+      animation: dropPulse 1.5s ease-in-out infinite;
+    }
+    @keyframes dropPulse {
+      0%,100% { border-color: var(--pri-a40); transform: scale(1); }
+      50% { border-color: var(--pri-lite-a80); transform: scale(1.02); }
+    }
+    .drop-icon { font-size: 44px; }
+    .drop-text { font-size: 15px; color: var(--on-glass-1); text-align: center; line-height: 1.6; }
+
+    /* ---- 文件上传动画 ---- */
+    #uploadAnim {
+      position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+      z-index: 40; display: none; flex-direction: column; align-items: center; gap: 10px;
+    }
+    #uploadAnim.show { display: flex; animation: iconPanelPop .2s; }
+    .upload-ring {
+      width: 48px; height: 48px; border-radius: 50%;
+      border: 3px solid var(--pri-lite-a20);
+      border-top-color: var(--pri-lite-ink);
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .upload-text { font-size: 12.5px; color: var(--w-85); }
+
+    /* 2.5D 舞台：透视空间里的真人写真 */
+    .stage { perspective: 900px; position: relative; }
+
+    /* ---- 任务条（工作模式·她的脚边）----
+       采用深玻璃一族（与气泡/环绕菜单同一套 token）。
+       **只画真有数据的东西**：`.tb2` 的状态文字（JS 驱动）+ ✦ 标记；
+       计数 = 这一件事的第几步，轨道 = "她还在动"的流光（**不画百分比**——不知道总共几步）。
+       见 renderTaskbar。 */
+    #taskbar {
+      /* 贴**她本体矩形的底边、在盒内**——不是挂在盒子下方：默认站位离屏幕底只有 SAFE(24px)，
+         挂下方会被窗口下缘裁掉。放盒内则 clampPos 保证她整只可见 ⇒ 任务条也永远可见，
+         且拖到哪儿都跟着她的脚。 */
+      position: absolute; left: 50%; bottom: 2px; transform: translateX(-50%);
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      max-width: 232px; padding: 6px 11px; border-radius: 11px;
+      background: var(--glass-bg); border: 1px solid var(--glass-line);
+      backdrop-filter: blur(14px) saturate(1.25); -webkit-backdrop-filter: blur(14px) saturate(1.25);
+      box-shadow: 0 8px 24px var(--glass-shadow);
+      color: var(--glass-ink); font-size: 11.5px; letter-spacing: .3px; white-space: nowrap;
+      pointer-events: none;                 /* 纯展示：不抢她身上的拖拽与点击 */
+      animation: taskbarIn .18s var(--tt-ease, ease);
+    }
+    @keyframes taskbarIn { from { opacity: 0; transform: translateX(-50%) translateY(3px); } }
+    #taskbar[hidden] { display: none; }
+    #taskbar .tb1 { display: flex; align-items: center; gap: 5px; opacity: .9; }
+    #taskbar .tb1 .nm { overflow: hidden; text-overflow: ellipsis; }
+    /* 没数据就不占位：计数为空时不显示；进度轨道**只在"她还在动"时出现**（i.live 由 JS 按真状态打） */
+    #taskbar .tb1 .n:empty { display: none; }
+    #taskbar .tb-prog { display: none; }
+    #taskbar .tb-prog:has(i.live) { display: block; }
+    #taskbar .tb2 { display: flex; align-items: center; gap: 5px; color: var(--white); }
+    #taskbar .tb2 .dot {
+      width: 5px; height: 5px; border-radius: 50%; background: var(--accent-soft);
+      animation: tbPulse 1.6s ease-in-out infinite;
+    }
+    @keyframes tbPulse { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+    .dir { width: 100%; height: 100%; }
+    .actor {
+      position: relative; transform-style: preserve-3d; transform-origin: 50% 100%;
+      display: flex; align-items: flex-end; justify-content: center;
+    }
+    .actor img {
+      height: 100%; width: auto; display: block; pointer-events: none;
+      border-radius: 18px 18px 0 0; /* 顶部柔和裁切 */
+      mask-image: linear-gradient(180deg, black 96%, transparent 100%);
+      -webkit-mask-image: linear-gradient(180deg, black 96%, transparent 100%);
+    }
+    /* 地面影子：随行走缩放/呼吸 */
+    .shadow {
+      position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%);
+      width: 74%; height: 14px; border-radius: 50%;
+      background: radial-gradient(ellipse, var(--aura-dim), transparent 70%);
+      filter: blur(4px);
+    }
+
+    /* 情绪光环（脚下） */
+    .aura {
+      position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%);
+      width: 96%; height: 40px; border-radius: 50%;
+      background: radial-gradient(ellipse, var(--aura-neutral), transparent 70%);
+      filter: blur(14px);
+    }
+    #wrap.emotion-comfort .aura { background: radial-gradient(ellipse, var(--aura-comfort), transparent 70%); }
+    #wrap.emotion-knowledge .aura { background: radial-gradient(ellipse, var(--aura-knowledge), transparent 70%); }
+
+    /* ---- 动效（2.5D 拟真）---- */
+    #wrap.idle .actor { animation: breathe 4.2s ease-in-out infinite; }
+    #wrap.talking .actor { animation: talk 0.6s ease-in-out infinite; }
+    #wrap.talking .aura { animation: auraPulse 0.9s ease-in-out infinite; }
+
+    @keyframes breathe { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-3px) scale(1.015); } }
+    @keyframes talk { 0%,100% { transform: translateY(0); } 30% { transform: translateY(-3px) scale(1.01); } 60% { transform: translateY(1px); } }
+    @keyframes auraPulse { 0%,100% { opacity: 0.7; } 50% { opacity: 1; } }
+
+    /* 兜底光球（无写真时） */
+    .orb { width: 92px; height: 92px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, var(--orb-1), var(--orb-2) 60%, var(--orb-3)); box-shadow: 0 0 44px var(--orb-glow); }
+    .orb-idle { animation: breathe 4.2s ease-in-out infinite; }
+
+    /* 任务条进度轨道：**不给百分比**（我们不知道总共几步，画假比例是骗人）——
+       改用一条来回流动的光，只表达"她还在动"；结束后停住。 */
+    #taskbar .tb-prog i.live { animation: tbFlow 1.6s linear infinite; }
+    @keyframes tbFlow { 0% { transform: translateX(-60%); } 100% { transform: translateX(220%); } }
+    @media (prefers-reduced-motion: reduce) { #taskbar .tb-prog i.live { animation: none; } }
+
+    /* 卡片诊断模式（LHCD_PET_OPAQUE=1） */
+    body.opaque { background: linear-gradient(165deg, var(--opaque-1) 0%, var(--opaque-2) 70%); border-radius: 22px; }
+    /* Live2D 模式：去掉一切非人物视觉元素（阴影/光环/写真），只留人物立绘；
+       禁用 CSS 步行动画（Live2D 模型参数已驱动步态，CSS 动画会叠加抖动） */
+    body.live2d-active .shadow, body.live2d-active .aura { display: none !important; }
+    body.live2d-active .actor img { display: none !important; }
+    body.live2d-active .orb { display: none !important; }
+    body.live2d-active #wrap.idle .actor { animation: none !important; }
+  </style>
+</head>
+<body>
+  <div id="pet">
+    <div id="wrap" class="idle">
+      <div class="bubble" id="bubble" hidden></div>
+      <!-- 审批气泡（brain 工具审批请求：允许/拒绝回执进 turn 循环） -->
+      <!-- 文案全部来自宿主一处（main.mjs 的 approvalCardPayload），这里只排版。
+           原始命令**叠起来**（默认收起）——它不该是正文：人看不懂，
+           还容易被 `2>/dev/null` 这种尾巴带偏。 -->
+      <div id="approvalCard" hidden>
+        <div class="ap-title"><span id="ap-title" data-i18n="pet.ap-title.1">TA 想做</span><span class="ap-risk" id="ap-risk"></span></div>
+        <div class="ap-why" id="ap-why" hidden></div>
+        <div class="ap-imp" id="ap-imp" hidden></div>
+        <button class="ap-rawt" id="ap-rawt" hidden data-i18n="pet.ap-rawt.1">看原始命令</button>
+        <div class="ap-cmd" id="ap-cmd" hidden>…</div>
+        <div class="ap-actions">
+          <button class="ap-btn deny" data-ap="deny" data-i18n="pet.ap-btn.1">不允许</button>
+          <button class="ap-btn allow" data-ap="allow" data-i18n="pet.ap-btn.2">就这一次</button>
+        </div>
+        <div class="ap-actions" id="ap-session-row" hidden>
+          <button class="ap-btn session" data-ap="session" data-i18n="pet.ap-btn.3">到这次对话结束都允许</button>
+          <button class="ap-btn session" data-ap="rule" id="ap-rule-btn" hidden data-i18n="pet.ap-rule-btn.1">以后这类都行</button>
+        </div>
+        <div class="ap-rule" id="ap-rule" hidden></div>
+      </div>
+
+      <!-- 环绕式行为菜单(样例版):透明小钮环绕躯干中段——💬胸口 ✦腰左 🧠腰右 ☕下腹 ···右肩;线性 SVG 图标;hover 浮出文字 -->
+      <div id="iconPanel" hidden>
+        <!-- 环上那条细弧：把四颗连成"一个环"，而不是四个孤立的钮。
+             路径由 JS 按四颗的**真实中心**算（`drawRingLine()`）。 -->
+        <svg id="ringLine" aria-hidden="true"></svg>
+        <button class="orb-btn" data-act="chat" title="和我聊聊" data-i18n-title="pet.orb-btn.1">
+          <svg viewBox="0 0 20 20" fill="none" stroke="var(--white)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4.5h12a2.5 2.5 0 0 1 2.5 2.5v5.5a2.5 2.5 0 0 1-2.5 2.5H9.2L5.4 18v-3H4A2.5 2.5 0 0 1 1.5 12.5V7A2.5 2.5 0 0 1 4 4.5z"/><path d="M6 9h8M6 11.6h5"/></svg>
+          <span class="ob-label" data-i18n="pet.orb-btn.1">和我聊聊</span></button>
+        <button class="orb-btn" data-act="work" title="帮我做事" data-i18n-title="pet.orb-btn.2">
+          <svg viewBox="0 0 20 20" fill="var(--white)" stroke="none"><path d="M10 1.6l1.9 6.1 6.5 2.3-6.5 2.3L10 18.4l-1.9-6.1-6.5-2.3 6.5-2.3z"/></svg>
+          <span class="ob-label" data-i18n="pet.orb-btn.2">帮我做事</span></button>
+        <!-- 这颗原来是「看看记忆」，现在改成**「更多」**（记忆从「更多 → 去别处」进）；
+             中心那颗 ⋯ 一并撤掉：环上只留高频四颗，去重后每项只有一个入口。 -->
+        <button class="orb-btn" data-act="more" title="更多" data-i18n-title="pet.orb-btn.3">
+          <svg viewBox="0 0 20 20" fill="var(--white)" stroke="none"><circle cx="4.5" cy="10" r="1.7"/><circle cx="10" cy="10" r="1.7"/><circle cx="15.5" cy="10" r="1.7"/></svg>
+          <span class="ob-label" data-i18n="pet.orb-btn.3">更多</span></button>
+        <button class="orb-btn" data-act="stay" title="陪我待会" data-i18n-title="pet.orb-btn.4">
+          <svg viewBox="0 0 20 20" fill="none" stroke="var(--white)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7.5h11v4.5a4 4 0 0 1-4 4h-3a4 4 0 0 1-4-4z"/><path d="M14.5 8.5h1.8a2.2 2.2 0 0 1 0 4.4h-1.8"/><path d="M6.5 4.8V3M10 4.8V3M13.5 4.8V3"/></svg>
+          <span class="ob-label" data-i18n="pet.orb-btn.4">陪我待会</span></button>
+        <!-- 子面板容器（帮我做事/更多/动作/换装/退出确认 从旁展开） -->
+        <div class="sub-panel" id="subPanel" hidden>
+          <div class="menu-item back" data-act="back" data-i18n="pet.menu-item.1">← 返回</div>
+          <div id="subPanelContent"></div>
+        </div>
+      </div>
+
+      <!-- 拖放文件覆盖层 -->
+      <div id="dropOverlay">
+        <div class="drop-card">
+          <div class="drop-icon">📥</div>
+          <div class="drop-text"><span data-i18n="pet.drop.hand">松手即可交给 TA 处理</span><br/><small data-i18n="pet.drop-text.1">支持文件 / 文件夹 / 图片 / 截图</small></div>
+        </div>
+      </div>
+
+      <!-- 文件上传处理动画 -->
+      <div id="uploadAnim">
+        <div class="upload-ring"></div>
+        <div class="upload-text" data-i18n="pet.upload-text.1">正在交给 TA 处理…</div>
+      </div>
+
+      <div class="stage">
+        <div class="dir" id="dir">
+          <div class="actor">
+            <canvas id="gl" hidden></canvas>
+            <div class="orb orb-idle" id="orb"></div>
+          </div>
+        </div>
+        <div class="shadow"></div>
+        <div class="aura"></div>
+        <!-- 任务条（只在工作模式 + 有活时出现） -->
+        <div id="taskbar" hidden>
+          <div class="tb1"><span>✦</span><span class="nm" id="tb-name" data-i18n="pet.tb-name.1">手头这件事</span><span class="n" id="tb-count"></span></div>
+          <div class="tb-prog"><i id="tb-fill"></i></div>
+          <div class="tb2"><span class="dot"></span><span id="tb-state" data-i18n="pet.tb-state.1">正在做</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./i18n.js"></script>
+
+  <script src="./vendor/pixi.min.js"></script>
+  <script src="./vendor/live2dcubismcore.min.js"></script>
+  <script src="./vendor/pixi-live2d-display.min.js"></script>
+  <script src="./state-words.js"></script>
+  <script src="./speech.js"></script>
+  <script src="./pet-live2d.js"></script>
+  <script>
+    const wrap = document.getElementById('wrap');
+    const bubble = document.getElementById('bubble');
+    const approvalCard = document.getElementById('approvalCard'); // 审批气泡
+    const apCmd = approvalCard.querySelector('.ap-cmd');
+    const iconPanel = document.getElementById('iconPanel');
+    const subPanel = document.getElementById('subPanel');
+    const subPanelContent = document.getElementById('subPanelContent');
+    const dropOverlay = document.getElementById('dropOverlay');
+    const uploadAnim = document.getElementById('uploadAnim');
+    const orb = document.getElementById('orb');
+    const glCanvas = document.getElementById('gl');
+    const stage = wrap.querySelector('.stage');
+    const dirEl = document.getElementById('dir');
+
+    if (new URLSearchParams(location.search).get('opaque') === '1') document.body.classList.add('opaque');
+    const mode = 'live2d';
+    let petLive2d = null;
+    const av = () => petLive2d;
+
+    /* ---- 形象尺度：**H 是唯一变量**，面板/环绕/间距全从它推 ----
+       H = 形象完整高度（不含气泡）；宽度 = H*0.75。
+       三档预设：小 220 / 中 300（默认）/ 大 400；⌥滚轮在 220~400 之间微调。
+       （不用 `baseCharH() × petScale` 两段相乘——屏幕一变档位含义就漂；现在只有一个数。） */
+    const PET_PRESETS = { small: 220, mid: 300, large: 400 };
+    const SIZE_WORDS = { small: '小', mid: '中', large: '大' };   // 只上人话档位，不念像素
+    /** 当前高度离哪一档最近（只为了在面板上标"现在是哪档"；不假装精确） */
+    function nearestSizeWord(h) {
+      let best = 'mid', d = Infinity;
+      for (const [k, v] of Object.entries(PET_PRESETS)) { const dd = Math.abs(v - h); if (dd < d) { d = dd; best = k; } }
+      return SIZE_WORDS[best];
+    }
+    const H_MIN = 220, H_MAX = 400;
+    const SAFE = 24;                       // 距屏幕边永远留这么多（安全边界）
+    let H = (() => {
+      const raw = parseInt(localStorage.getItem('petH'), 10);
+      return Number.isFinite(raw) ? Math.max(H_MIN, Math.min(H_MAX, raw)) : PET_PRESETS.mid;
+    })();
+    let charH = 0, charW = 0;
+    /** 改尺寸并**以脚为锚**（她脚下那点不动）——点选与 ⌥滚轮共用这一条，
+     *  否则同一个"变大"两条路她停的位置不一样。 */
+    function applySizeKeepingFeet(nextH) {
+      /* ⚠ 锚点必须量**舞台矩形**，不能拿 pos 算：`pos` 是 wrap 的左上角，而**气泡是 wrap 的第一个孩子**
+         （气泡一出现，舞台就整体下移一个气泡的高度）。按 `pos.y + charH` 当"脚"，
+         换档后她会往下掉 53px = 当时气泡的高度。 */
+      const before = stage.getBoundingClientRect();
+      const feetX = before.left + before.width / 2, feetY = before.bottom;   // 她的脚（底边中点，视口坐标）
+      H = Math.max(H_MIN, Math.min(H_MAX, nextH));
+      localStorage.setItem('petH', String(H));
+      applyStageSize();
+      const after = stage.getBoundingClientRect();
+      // 用"改完之后实际偏了多少"去修正 wrap 的位置 —— 对气泡在不在场都成立
+      place(pos.x + (feetX - (after.left + after.width / 2)), pos.y + (feetY - after.bottom), false);
+      if (!iconPanel.hidden) { syncRingBox(); syncRingMetrics(); clampRing(); positionSubPanel(); }
+    }
+    /** 三档预设走的入口（点选）——滚轮直接调 applySizeKeepingFeet */
+    function setStageHeight(h) { applySizeKeepingFeet(h); }
+    /* 环的基准倍率（**唯一来源**）：applyStageSize 按它写 CSS，clampRing 收半径时也从它算。
+       ⚠ 改这里就够了 —— CSS 的 `var(--ring-x, .30)` 只是兜底字面量（两边必须同步改）。 */
+    const RING_BASE = { x: 0.30, y: 0.30, up: 0.55 };
+    function applyStageSize() {
+      // 屏幕太矮时按可用高度收一档（只夹显示高度，不动用户存的 H）
+      charH = Math.min(H, Math.max(H_MIN, innerHeight - SAFE * 2));
+      charW = Math.round(charH * 0.75);
+      document.documentElement.style.setProperty('--H', charH + 'px');
+      // 环的倍率（唯一来源）：四个外圈钮离她中心多远。改这里就够了——CSS 与 clampRing 都读它
+      // 0.30 锚到看得见的她（0.36 算下来"环 ≈ 她一个人那么大"，收一档才像"围着她"）。
+      // 上面那颗**不跟着收**：她的帽顶在中心上方约 0.5H，收到 0.30H 就压脸上了（所以用 0.55）。
+      document.documentElement.style.setProperty('--ring-x', String(RING_BASE.x));
+      document.documentElement.style.setProperty('--ring-y', String(RING_BASE.y));
+      document.documentElement.style.setProperty('--ring-up', String(RING_BASE.up));
+      stage.style.height = charH + 'px';
+      stage.style.width = charW + 'px';
+      // 环绕小钮跟随 TA 缩放：短边 **1/6**（顶到 ~52px 才"看得清、点得准"；1/9 只有 33px，偏小）
+      document.documentElement.style.setProperty('--obsize', Math.max(24, Math.round(Math.min(charW, charH) / 6)) + 'px');
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      glCanvas.width = Math.round(charW * dpr);
+      glCanvas.height = Math.round(charH * dpr);
+      av()?.resize(glCanvas.width, glCanvas.height);
+    }
+    applyStageSize();
+
+    // iconmode：应用图标渲染——角色居中（图标只显形态，透明底）
+    const iconMode = new URLSearchParams(location.search).get('iconmode') === '1';
+    /* 固定落脚区 + 安全边界（位置只由这里算）
+       默认站在右下角距边 SAFE；拖过之后记住位置；**任何时候都夹进边界内**——
+       这样放大后也不会跑到看不见的地方。 */
+    const homePos = () => ({ x: Math.round(innerWidth - charW - SAFE), y: Math.round(innerHeight - charH - SAFE) });
+    function clampPos(p) {
+      const maxX = Math.max(SAFE, innerWidth - charW - SAFE);
+      const maxY = Math.max(SAFE, innerHeight - charH - SAFE);
+      return { x: Math.round(Math.max(SAFE, Math.min(p.x, maxX))), y: Math.round(Math.max(SAFE, Math.min(p.y, maxY))) };
+    }
+    const savedPos = (() => {
+      try { const j = JSON.parse(localStorage.getItem('petPos') ?? 'null'); return j && Number.isFinite(j.x) && Number.isFinite(j.y) ? j : null; } catch { return null; }
+    })();
+    let pos = iconMode
+      ? { x: Math.round((innerWidth - charW) / 2), y: Math.round((innerHeight - charH) / 2) }
+      : clampPos(savedPos ?? homePos());
+
+    function place(x, y, animate, dur = 0) {
+      pos = clampPos({ x, y });
+      wrap.style.transition = animate ? `left ${dur}ms linear, top ${dur}ms linear` : 'none';
+      wrap.style.left = pos.x + 'px';
+      wrap.style.top = pos.y + 'px';
+    }
+    place(pos.x, pos.y, false);
+    // 换窗尺寸/换屏幕：重新算一遍并夹回来（形象永远完整可见）
+    window.addEventListener('resize', () => { applyStageSize(); syncRingMetrics(); place(pos.x, pos.y, false); if (!iconPanel.hidden) { syncRingBox(); clampRing(); positionSubPanel(); } });
+
+    // ---- 状态标志 ----
+    let settingsOpen = false;      // 管理中心打开时不走动
+    let quickOpen = false;         // 输入弹层开着 → TA 原地等,不再走丢
+
+    // ---- 自由走动 ----
+    function panelsOpen() {
+      return !iconPanel.hidden || !subPanel.hidden || !approvalCard.hidden || quickOpen; // 审批待决/输入中角色原地等待
+    }
+    // ---- 模式（闲聊/工作）——工作模式形象固定不动 + 菜单换文案 ----
+    let agentMode = 'chat';
+    function applyAgentMode(mode) {
+      const work = mode === 'work';
+      agentMode = work ? 'work' : 'chat';
+      const workBtn = iconPanel.querySelector('.orb-btn[data-act="work"]');
+      const stayBtn = iconPanel.querySelector('.orb-btn[data-act="stay"]');
+      if (workBtn) {
+        workBtn.querySelector('.ob-label').textContent = work ? '工作台' : '帮我做事';
+        workBtn.classList.toggle('hot', work);
+        let badge = workBtn.querySelector('.ob-num');
+        if (work && !badge) { badge = document.createElement('span'); badge.className = 'ob-num'; workBtn.append(badge); }
+        if (!work && badge) badge.remove();
+      }
+      if (stayBtn) {
+        stayBtn.classList.toggle('dim', work);
+        stayBtn.querySelector('.ob-label').textContent = work ? '干活时先不陪你啦' : '陪我待会';
+      }
+      /* 这里的「working」类名管的是**模式**（工作模式不漫步），不是"她在忙"——
+         别把它跟下面七态里的 `working` 混了（那个是"工具在跑"）。 */
+      wrap.classList.toggle('working', work);
+      petPaint();   // 模式变了要重画（固定态是七态的覆盖层）
+      renderTaskbar?.();
+    }
+    /* ---------- 七态状态机 ----------
+       七态（优先级从高到低，**一次只演一个，最显眼的赢**）：
+         等点头 > 开心 > 在忙 > 在想 > 听着 > 望着你 > 自己待着
+       来源（都是现成的信号，没有新造一套）：
+         · 等点头 / 在忙 / 在想 / 听着 ← 宿主的 `task-state`（唯一真源在 ui/state-words.js）
+         · 开心 ← 宿主的 `pet-mood`（判"说了谢谢/夸她/爱她"这类输入）——**只演一次**
+         · 望着你 ← 本地：闲下来 90 秒没动静 → 慢慢看你一眼（一次，不是循环动画）
+         · 自己待着 ← 默认
+       「固定态」（工作模式不漫步）**不占七态**：它是**覆盖层**，只改"自己待着"怎么演。
+       同时满足多个条件时全演 = 抽搐，所以一次只演一个。 */
+    const PET_PRIORITY = ['approval', 'joy', 'working', 'thinking', 'listening', 'waiting', 'idle'];
+    const PET_WORD = { approval: '等你点头', joy: '开心', working: '在忙', thinking: '在想', listening: '听着', waiting: '望着你', idle: '自己待着' };
+    const petActive = new Set(['idle']);
+    let petJoyTimer = null, petWaitTimer = null, petWaitLookTimer = null;
+    function petSet(state, on) { if (on) petActive.add(state); else petActive.delete(state); petPaint(); }
+    function petPaint() {
+      let pick = 'idle';
+      for (const s of PET_PRIORITY) { if (petActive.has(s)) { pick = s; break; } }
+      wrap.dataset.pstate = pick;
+      wrap.dataset.pstateWord = PET_WORD[pick] ?? '';
+      // 固定态（工作模式）：只影响"自己待着"（不漫步），其余六态照演
+      wrap.classList.toggle('p-fixed', agentMode === 'work' && pick === 'idle');
+    }
+    /** 开心：**只演一次**（反复播会变成廉价的讨好——这条写进注释，别改成循环） */
+    function petDelight(ms = 6000) {
+      clearTimeout(petJoyTimer);
+      petSet('joy', true);
+      petJoyTimer = setTimeout(() => petSet('joy', false), ms);
+    }
+    /** 望着你：闲下来 90 秒 → 看你一眼（8 秒），然后回到自己待着 */
+    function petResetWaitClock() {
+      clearTimeout(petWaitTimer);
+      petSet('waiting', false);
+      petWaitTimer = setTimeout(() => {
+        const busy = ['approval', 'joy', 'working', 'thinking', 'listening'].some((x) => petActive.has(x));
+        if (busy) return;                       // 她正忙着/正等你 → 不"望"
+        if (document.hidden) return;            // 屏幕都不看 → 不演给谁看
+        petSet('waiting', true);
+        clearTimeout(petWaitLookTimer);
+        petWaitLookTimer = setTimeout(() => petSet('waiting', false), 8000);
+      }, 90000);
+    }
+    try {
+      window.api.onPetMood?.((m) => { if (m?.kind === 'joy') petDelight(); });
+      window.api.onApprovalAsk?.(() => { petSet('approval', true); petResetWaitClock(); });
+      window.api.onApprovalResolved?.(() => petSet('approval', false));
+    } catch { /* 老宿主无此 API */ }
+    ['click', 'mousemove', 'keydown'].forEach((ev) => window.addEventListener(ev, petResetWaitClock, { passive: true }));
+    petResetWaitClock();
+
+    try {
+      window.api.modeGet?.().then((r) => { if (r?.ok) applyAgentMode(r.mode); }).catch(() => {});
+      window.api.onModeChanged?.((d) => applyAgentMode(d?.mode ?? 'chat'));
+    } catch { /* 老宿主无此 API */ }
+
+    // ---- 任务条——工作模式下脚边显示"做到哪了"；文字一律走**粗粒度**（不出现路径/命令） ----
+    const taskbar = document.getElementById('taskbar');
+    let tbState = 'Idle';
+    let tbStep = '';
+    let tbWord = '';
+    let tbBusy = false;
+    let ringOpen = false;   // 环开着的时候任务条让位（见 openIconPanel：两颗圆钮叠在一起太脏）
+    let tbSteps = 0;        // 这一件事已经走到第几步（真数出来的，不是画的）
+    let tbT0 = 0;           // 这件事从什么时候开始的（本地墙钟，与对话里那行同一个口径）
+    let tbTimer = null;
+    /** 任务条按真数据填：
+     *    · 名字 = 她正在做什么（粗粒度，**不带路径/命令**，与对话页同一套词）
+     *    · 第几步 = 这一件事里真实的 step 计数
+     *    · 已 N 秒 = 本地墙钟（内核事件不带时间戳）
+     *  进度轨道**不给百分比**：不知道总共几步，画假比例是骗人。
+     *  改用"她还在动"的流光——它只表达一件事：**在动**。 */
+    function renderTaskbar() {
+      if (!taskbar) return;
+      // 环一开就让位：底部那颗钮（陪我待会）正好落在任务条上，两个深色圆钮叠在一起太脏。
+      //   与「环绕菜单一开、对话面板收起」同一条"不堆叠"规矩。
+      const show = agentMode === 'work' && !ringOpen && (tbBusy || !!tbStep || tbSteps > 0);
+      taskbar.hidden = !show;
+      if (tbTimer) { clearInterval(tbTimer); tbTimer = null; }
+      if (!show) return;
+      const secs = () => (tbT0 ? Math.max(0, Math.round((Date.now() - tbT0) / 1000)) : 0);
+      const paint = () => {
+        const nm = document.getElementById('tb-name');
+        if (nm) nm.textContent = tbStep || tbWord || '正在做';
+        const n = document.getElementById('tb-count');
+        if (n) n.textContent = tbSteps > 0 ? DT('pet.js.tpl.1', '第 {p1} 步 · 已 {p2} 秒', { p1: tbSteps, p2: secs() }) : (secs() > 4 ? DT('pet.js.tpl.2', '已 {p1} 秒', { p1: secs() }) : '');
+        const st = document.getElementById('tb-state');
+        if (st) st.textContent = tbBusy && tbSteps === 0 ? (tbWord || '正在做') : (tbStep ? '正在做' : (tbWord || '正在做'));
+        const fill = document.getElementById('tb-fill');
+        // 轨道 = "她还在动"（有活在手、或在忙），**不给百分比**（我们不知道总共几步）
+        if (fill) fill.classList.toggle('live', !!tbStep || !!tbBusy);
+      };
+      paint();
+      if (tbBusy) tbTimer = setInterval(paint, 1000);
+    }
+    try {
+      window.api.onPetStep?.((d) => {
+        if (d?.phase === 'start') { tbSteps++; tbStep = d?.label ?? ''; if (!tbT0) tbT0 = Date.now(); }
+        else { tbStep = ''; }
+        renderTaskbar();
+      });
+      window.api.onTaskState?.((ev) => {
+        tbState = ev?.to ?? 'Idle';
+        /* 状态词 → 七态（一次只演一个由 petPaint 的优先级表保证）。
+           Success/Error/Cancelled/Quiet 不占七态——它们是"这件事的结局"，演完就回到自己待着。 */
+        const map = { Approval: 'approval', Working: 'working', Thinking: 'thinking', Listening: 'listening' };
+        for (const st of ['approval', 'working', 'thinking', 'listening']) petSet(st, map[tbState] === st);
+        if (map[tbState]) petResetWaitClock();
+        tbWord = ev?.word ?? ''; // 一处真源（ui/state-words.js）随广播带过来
+        tbBusy = (globalThis.TaskWords?.BUSY_STATES ?? []).includes(tbState);
+        if (tbBusy && !tbT0) tbT0 = Date.now();
+        if (!tbBusy) { tbStep = ''; tbSteps = 0; tbT0 = 0; }   // 这件事结束 → 计数归零，下次重新数
+        renderTaskbar();
+      });
+    } catch { /* 老宿主无此 API */ }
+
+    /* ---- **原地动作由她自己挑** ----
+       手选菜单已删；这里是她自己的节奏：
+       · 眨眼 / 呼吸 在渲染层一直跑（pet-live2d.js 的 idleTick），这边不用管
+       · 点头 / 挥手 由这个调度器偶尔触发，**按当时的心情加权**：开心更容易挥手、
+         被安慰/低落时只是点点头；忙（面板开着/在拖拽/设置里）就安静不动
+       · 挥手要先问模型 `canWave()`（有没有手臂参数）——没有就不挥，**不假装** */
+    let lastEmotion = 'neutral';
+    function idlePicker() {
+      const wait = 22000 + Math.random() * 38000;   // 22~60 秒一次
+      setTimeout(() => {
+        try {
+          /* 由**七态里最高的那一态**决定要不要动小动作——
+             · `p-fixed`（工作模式的覆盖层）：安静待着，不主动做动作（位置固定，能乱的就是这些小动作）
+             · 正忙/正等你点头/正在听 → 也不做（注意力在你身上或在活上）
+             · 只有"自己待着"或"望着你"时才偶尔点个头、挥个手 */
+          const pstate = wrap.dataset.pstate ?? 'idle';
+          const quiet = wrap.classList.contains('p-fixed') || !['idle', 'waiting'].includes(pstate);
+          if (!quiet && !panelsOpen() && !dragging && !settingsOpen && !document.hidden) {
+            const av = petLive2d;
+            if (av?.autoAction) {
+              const joyful = ['joy', 'bright', 'happy'].includes(lastEmotion);
+              const soft = ['comfort', 'sad', 'anxious', 'knowledge'].includes(lastEmotion);
+              let pick = ['nod', 'nod', 'blink'];                       // 默认：点头 + 眨眼
+              if (joyful) pick = av.canWave?.() ? ['wave', 'wave', 'nod', 'blink'] : ['nod', 'nod', 'blink'];
+              else if (soft) pick = ['nod', 'nod', 'nod', 'blink'];      // 低落/被安慰时只是点点头
+              else if (av.canWave?.()) pick.push('wave');
+              av.autoAction(pick[Math.floor(Math.random() * pick.length)]);
+            }
+          }
+        } catch { /* 安静跳过 */ }
+        idlePicker();
+      }, wait);
+    }
+    idlePicker();
+
+    // ---- 手势：按下→拖拽；单击=对话/摸头；双击=图标面板 ----
+    let press = null, dragging = false, dragOff = { x: 0, y: 0 };
+    let clickTimer = null, clickCount = 0;
+
+    wrap.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      if (e.target.closest('#iconPanel, #dropOverlay')) return;
+      press = { x: e.clientX, y: e.clientY, t: Date.now() };
+      dragging = false;
+      closeIconPanel();
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (!press) return;
+      if (!dragging && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 6) {
+        dragging = true;
+        dragOff = { x: e.clientX - pos.x, y: e.clientY - pos.y };
+      }
+      if (dragging) place(e.clientX - dragOff.x, e.clientY - dragOff.y, false);
+    });
+    window.addEventListener('mouseup', (e) => {
+      if (!press) return;
+      const moved = Math.hypot(e.clientX - press.x, e.clientY - press.y);
+      if (!dragging && moved <= 6) {
+        clickCount++;
+        clearTimeout(clickTimer);
+        clickTimer = setTimeout(() => {
+          if (clickCount >= 2) openIconPanel();
+          else {
+            const areas = av()?.hitTestAt?.(e.clientX, e.clientY) ?? [];
+            if (areas.includes('Head')) touchReact('head');
+            else if (areas.includes('Body')) touchReact('body');
+            else openChat();
+          }
+          clickCount = 0;
+        }, 500);
+      }
+      if (dragging) { dragging = false; localStorage.setItem('petPos', JSON.stringify(pos)); }
+      press = null;
+    });
+
+    // ---- 摸头/戳身体分区反应(文案分层:害羞开心/嗔怪,带情绪动作与注视) ----
+    const TOUCH_LINES = {
+      head: ['呜…摸头会害羞的啦', '嘿嘿…最喜欢你这样啦', '头发要被你摸乱啦～', '再摸一下…就一下哦', '嗯哼？被摸头的话，会更有力气干活哦'],
+      body: ['呀！突然戳我～', '再戳我就要跳走了哦', '戳戳也不会有奖励的啦', '好啦好啦，我在呢，说吧', '嘿嘿，痒！有话好好说嘛'],
+    };
+    function touchReact(kind) {
+      const lines = TOUCH_LINES[kind] ?? TOUCH_LINES.body;
+      const text = lines[Math.floor(Math.random() * lines.length)];
+      av()?.setEmotion?.(kind === 'head' ? 'joy' : 'angry');
+      av()?.playAction?.(kind === 'head' ? 'wave' : 'shake');
+      showBubble(text, kind === 'head' ? 'joy' : 'angry', 3200);
+      petLive2d?.lookAt?.(pos.x + charW / 2, pos.y - 60, 4000);
+    }
+
+    function openChat() {
+      // 单击 TA → TA 头顶冒「在想什么?」→ 下方浮出纯输入条(空气感,非完整面板)
+      showBubble('在想什么?', 'neutral', 1600);
+      setTimeout(() => {
+        // 带上角色宽高（主进程按舞台/角色比例适配输入条尺寸与位置）;lite=纯输入条形态
+        window.api.petChat({ x: pos.x, y: pos.y, w: charW, h: charH }, undefined, 'lite');
+        petLive2d?.lookAt?.(pos.x + charW / 2, pos.y + charH * 0.5, 8000);
+      }, 420);
+    }
+
+    // ---- 透明图标面板（双击触发） ----
+    /* 面板底部曾被裁 ⇒「备份 / 退出」落在屏幕外**点不到**。
+       现在**一处**算完（不再有第二个 positionPanel 各算一半、互相打架）：
+       ① 横向：右侧放不下就从左侧弹（她常驻屏幕右缘，所以通常走左侧）；
+       ② 纵向：面板顶对齐她的盒子顶部，可用高度 = 视口底 − 顶 − 8；放不下就整体上移，
+          保证**底边永远留在屏幕里**（最后一行永远点得到）。 */
+    function positionSubPanel() {
+      const sr = iconPanel.getBoundingClientRect();
+      const toLeft = sr.right + 340 > innerWidth; // 右侧放不下 → 从左侧弹
+      subPanel.style.left = toLeft ? 'auto' : 'calc(100% + 16px)';
+      subPanel.style.right = toLeft ? 'calc(100% + 16px)' : 'auto';
+      subPanel.style.transform = 'none';
+      subPanel.style.bottom = 'auto';
+      subPanel.classList.remove('below');
+      subPanel.style.maxHeight = 'none';                 // 先放开，量真实内容高度
+      const need = subPanel.scrollHeight || 420;
+      // 高度：内容多高就多高，最多不超过一屏（留 8px 边）
+      const h = Math.min(need, innerHeight - 16);
+      subPanel.style.maxHeight = Math.round(h) + 'px';
+      // 纵向：先试"面板顶对齐她的盒顶"，放不下就**整体上移**，保证底边留在屏幕里（最后一行永远可见）。
+      //   ⚠ 只把高度夹到"剩余空间"是不够的——那样面板照样从她的盒顶往下排、照样被裁，
+      //   只是变成内部滚动条（要的是"点得到退出"，不是"滚一下才点得到"）。
+      const want = innerHeight - 8 - h - sr.top;         // 相对她的盒顶的偏移（负 = 上移）
+      const top = Math.max(8 - sr.top, Math.min(0, want)); // 上限：别顶出屏幕上沿
+      subPanel.style.top = Math.round(top) + 'px';
+    }
+    /* 环越界就整体内移（环放大之后，她贴屏幕边时外圈钮会跑到屏幕外点不到）。
+       只挪外圈四颗。最多挪 0.4H，不至于把她围歪。 */
+    function clampRing() {
+      if (!iconPanel || iconPanel.hidden) return;
+      const root = getComputedStyle(document.documentElement);
+    // ⚠ 倍率读**基准值**，不读当前 CSS 值：否则收过一次半径之后，下次再收就是"在小的基础上再收"
+    //   （而且永远回不去）。基准 = `RING_BASE`（applyStageSize 写进 CSS 的那三个数，唯一来源）。
+    const rx = RING_BASE.x, ry = RING_BASE.y, ru = RING_BASE.up;
+    // ⚠ 半径按**看得见的高度**算（与 CSS 用同一个 --ring-h），不是舞台盒高
+    const rh = ringMetrics.ringH || charH;
+    const R = rh * rx, Ry = rh * ry, Ru = rh * ru;
+      const ob = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--obsize')) || 33;
+      const half = ob / 2;
+      // ⚠ 环心取**面板自己的矩形**（= 她的盒子），不另算一套：CSS 用 50%/50% 摆钮，
+      //   夹取就必须用同一个中心，否则两套算法一打架，气泡一出现环就偏。
+      const pr = iconPanel.getBoundingClientRect();
+      const cx = pr.left + pr.width / 2, cy = pr.top + pr.height / 2 + (ringMetrics.cy || 0);
+      const lim = charH * 0.4;
+      let dx = 0, dy = 0;
+      /* 窗口装不下时，**光靠平移是不够的**——平移上限 `lim=0.4×身高` 一到，钮就顶在窗口边上被裁掉。
+         所以先**按窗口自适应收半径**：把四颗一起往中心收，收到四颗都出不了界为止；再退回平移兜底。
+         ⚠ 注意：曾把「只看见左右两颗」误判为窗口裁切，真因是 `--white` 变量失效
+         （stroke 图标的 stroke 退成 none，💬/☕ 整颗不画；✦/⋯ 是 fill，退成黑仍然可见）——与几何无关。
+         收半径这条本身仍有用（她贴屏幕上沿时，上面那颗确实会出界），保留。 */
+      const margin = 6;                                   // 钮自己还有一半尺寸，留一点呼吸
+      const fitUp = Math.max(0, cy - half - margin);      // 中心往上能走多远
+      const fitDown = Math.max(0, innerHeight - half - margin - cy);
+      const fitX = Math.max(0, Math.min(cx, innerWidth - cx) - half - margin);
+      const needUp = Ru || 1, needDown = Ry || 1, needX = R || 1;
+      const sc = Math.min(fitUp / needUp, fitDown / needDown, fitX / needX, 1);   // 装得下 = 1
+      // **每次都写**（不是只在越界时写）：装得下就把基准写回去——拖到边角收过半径之后，拖回来要能复原
+      const root2 = document.documentElement.style;
+      root2.setProperty('--ring-up', (ru * sc).toFixed(3));
+      root2.setProperty('--ring-y', (ry * sc).toFixed(3));
+      root2.setProperty('--ring-x', (rx * sc).toFixed(3));
+      if (cx - R - half < 0) dx = -(cx - R - half);
+      else if (cx + R + half > innerWidth) dx = innerWidth - (cx + R + half);
+      if (cy - Ru - half < 0) dy = -(cy - Ru - half);      // 上面那颗更远 → 用 Ru 判越界
+      else if (cy + Ry + half > innerHeight) dy = innerHeight - (cy + Ry + half);
+      dx = Math.max(-lim, Math.min(lim, dx));
+      dy = Math.max(-lim, Math.min(lim, dy));
+      document.documentElement.style.setProperty('--ring-dx', Math.round(dx) + 'px');
+      document.documentElement.style.setProperty('--ring-dy', Math.round(dy) + 'px');
+      drawRingLine({ R: R * sc, Ry: Ry * sc, Ru: Ru * sc, dx, dy });
+    }
+    /** 环上那条细弧：一圈**虚线光滑椭圆**，穿过四颗钮的中心。
+     *  四颗的方位是"上/左/右/下"，**恰好落在同一个椭圆上**：
+     *    rx = 0.30H（左右）、ry = (0.55H + 0.30H)/2、椭圆心比环心下移 (0.30H − 0.55H)/2，
+     *    代进去：椭圆上顶点 = −0.55H ✓、下顶点 = +0.30H ✓。
+     *  `R/Ry/Ru` 用的是**收缩后**的半径（与 CSS 里那三个变量同一批值），dx/dy 是夹取位移。 */
+    function drawRingLine({ R, Ry, Ru, dx, dy }) {
+      const line = document.getElementById('ringLine');
+      if (!line) return;
+      const w = iconPanel.offsetWidth, h = iconPanel.offsetHeight;
+      if (!w || !h) return;
+      const ox = w / 2 + dx;
+      const oy = h / 2 + (ringMetrics.cy || 0) + dy + (Ry - Ru) / 2;   // 椭圆心（上下不对称 → 下移半差）
+      const ry = (Ru + Ry) / 2;
+      line.setAttribute('viewBox', `0 0 ${w} ${h}`);
+      line.setAttribute('width', String(w));
+      line.setAttribute('height', String(h));
+      line.innerHTML = `<ellipse cx="${ox.toFixed(1)}" cy="${oy.toFixed(1)}" rx="${Math.max(1, R).toFixed(1)}" ry="${Math.max(1, ry).toFixed(1)}"/>`;
+    }
+
+    /** 量"**看得见的她**"：把 Live2D 的真实外接框换算成环要用的两个量。
+     *  · `--ring-h`：看得见的高度（半径按它算，不按舞台盒）
+     *  · `--ring-cy`：她的中心相对盒子中心的偏移（脚踩盒底、透明边距在上 → 中心偏下）
+     *  拿不到模型（还没加载/加载失败）就退回盒子：**宁可退回旧行为，也不要环乱飘**。 */
+    function syncRingMetrics() {
+      const root = document.documentElement.style;
+      const vb = (typeof av === 'function' ? av() : null)?.visibleBox?.() ?? null;
+      if (vb && vb.hF > 0.2 && vb.hF <= 1.2) {
+        const h = Math.round(charH * vb.hF), cy = Math.round(((vb.topF + vb.hF / 2) - 0.5) * charH);
+        root.setProperty('--ring-h', h + 'px');
+        root.setProperty('--ring-cy', cy + 'px');
+        ringMetrics = { H: charH, ringH: h, cy, src: 'model' };
+      } else {
+        root.setProperty('--ring-h', charH + 'px');
+        root.setProperty('--ring-cy', '0px');
+        ringMetrics = { H: charH, ringH: charH, cy: 0, src: 'box' };
+      }
+    }
+    let ringMetrics = { H: 0, ringH: 0, cy: 0, src: 'init' };
+
+    /** 环的坐标系 = **她本体的盒子**（不是含气泡的整个 wrap）。
+     *  `#iconPanel` 是 `inset:0` 的 wrap 覆盖层，而气泡是 wrap 的第一个孩子 ——
+     *  **气泡一出现，wrap 变高、环心随之上移**（她在环里"往下掉"）。
+     *  每次开环/改尺寸/气泡显隐都把面板对齐到 `.stage` 的矩形上；
+     *  `clampRing` 也读这个矩形（不用 pos.y + charH/2 另算一套，那套在气泡可见时同样错）。 */
+    function syncRingBox() {
+      if (!iconPanel) return;
+      const sr = stage.getBoundingClientRect();
+      const wr = wrap.getBoundingClientRect();
+      iconPanel.style.left = Math.round(sr.left - wr.left) + 'px';
+      iconPanel.style.top = Math.round(sr.top - wr.top) + 'px';
+      iconPanel.style.right = 'auto';
+      iconPanel.style.bottom = 'auto';
+      iconPanel.style.width = Math.round(sr.width) + 'px';
+      iconPanel.style.height = Math.round(sr.height) + 'px';
+    }
+    // 衣柜页点「在形象端打开换装面板」→ 这里把环打开并切到换装那一层
+    window.api.onPetOpenOutfit?.(() => {
+      try { openIconPanel(); openSubPanel('outfit'); } catch { /* 面板打不开也别炸 */ }
+    });
+    function openIconPanel() {
+      // 「不堆叠」：环绕菜单一开，对话面板（另一个窗）就收起
+      try { if (quickOpen) window.api.quickHide?.(); } catch { /* 老宿主无此 API */ }
+      cancelPendingClose();
+      subPanel.hidden = true;
+      iconPanel.hidden = false;
+      ringOpen = true; renderTaskbar();     // 任务条让位（见 renderTaskbar 注释）
+      syncRingBox();
+      syncRingMetrics();                    // 半径按"看得见的她"算
+      clampRing();
+      positionSubPanel();
+    }
+    /* ⚠ 收起有 150ms 动画，于是"排队中的隐藏"会**晚到**：双击关掉、150ms 内又双击打开，
+       那颗定时器照样把刚打开的环按下去（子面板跟着一起没）。所以开环/开子面板都要先取消它。 */
+    let closeTimer = null;
+    function cancelPendingClose() {
+      if (closeTimer) { clearTimeout(closeTimer); closeTimer = null; }
+      iconPanel.classList.remove('closing');
+    }
+    function closeIconPanel() {
+      if (iconPanel.hidden) return;
+      cancelPendingClose();
+      iconPanel.classList.add('closing');
+      closeTimer = setTimeout(() => {
+        closeTimer = null;
+        iconPanel.hidden = true;
+        iconPanel.classList.remove('closing');
+        subPanel.hidden = true;
+        ringOpen = false; renderTaskbar();
+      }, 150);
+    }
+
+    // 行为菜单点击（4 项:和我聊聊 / 帮我做事 / 更多 / 陪我待会;二层/三层全在子面板展开）
+    iconPanel.addEventListener('click', (e) => {
+      // 子面板返回按钮
+      const back = e.target.closest('[data-act="back"]');
+      if (back) { subPanel.hidden = true; return; }
+      // 退出确认按钮（先于通用菜单项判定）
+      const quitBtn = e.target.closest('[data-action="quit-confirm"], [data-action="quit-cancel"]');
+      if (quitBtn && !subPanel.hidden) {
+        subPanel.hidden = true;
+        if (quitBtn.dataset.action === 'quit-confirm') { closeIconPanel(); window.api.appQuit?.(); }
+        return;
+      }
+      // 子面板内的菜单项（帮我做事卡片/更多/动作/表情/换装/服装部件）
+      const subItem = e.target.closest('.menu-item, .act-card');
+      if (subItem && !subPanel.hidden) { handleSubItemClick(subItem); return; }
+      // 一级行为项(环绕小钮)
+      const btn = e.target.closest('.orb-btn');
+      if (!btn) return;
+      const act = btn.dataset.act;
+      // 现场诊断：点钮时记一行——她在哪 / 模型还在不在 / 画布多大 / 面板开没开。
+      // 以后再出"点了没反应/她不见了"可据此定位。
+      try {
+        window.api.petDiag?.(`click ${act} pos=${pos.x},${pos.y} H=${charH} canvas=${glCanvas.width}x${glCanvas.height} model=${!!petLive2d?.hasModel?.()} icon=${!iconPanel.hidden} sub=${!subPanel.hidden}`);
+      } catch { /* 老宿主无此 API */ }
+      if (act === 'chat') { closeIconPanel(); openChat(); }
+      else if (act === 'work') {
+        // 工作模式下这颗钮变成「工作台」直达（进度与控制在灵核家）
+        if (agentMode === 'work') { closeIconPanel(); window.api.homeOpen?.(); }
+        else openSubPanel('work'); // 闲聊时仍是 ✦ 帮我做事:二层展开(自然语言第一,能力藏后面)
+      }
+      else if (act === 'stay') openSubPanel('stay'); // ☕ 陪我待会:设置直达 + 静静陪着
+      else if (act === 'more') openSubPanel('more'); // ··· 更多:三组分组(低频全在这;记忆也在这)
+    });
+
+    // ---- 子面板渲染 ----
+    function openSubPanel(type) {
+      cancelPendingClose();                  // ⚠ 打开时要把"排队中的收起"取消掉（见 closeIconPanel）
+      subPanel.classList.toggle('wide', type === 'work'); // 帮我做事:按钮卡片需要更宽
+      if (type === 'work') {
+        subPanelContent.innerHTML = '<div class="menu-title">帮我做什么?</div>'
+          + '<div class="act-grid">'
+          + '<div class="act-card" data-action="file"><span class="ac-ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/></svg></span><span class="ac-t">处理文件</span><span class="ac-d">选个文件，我读、改、整理</span></div>'
+          + '<div class="act-card" data-action="screen"><span class="ac-ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="2.6"/></svg></span><span class="ac-t">看我的屏幕</span><span class="ac-d">我看一眼屏幕，说说看到什么</span></div>'
+          + '<div class="act-card" data-action="arrange"><span class="ac-ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="16" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M8.5 14.5l1.8 1.8 3.6-3.6"/></svg></span><span class="ac-t">帮我安排</span><span class="ac-d">提醒、日程、计划都交给我</span></div>'
+          + '<div class="act-card" data-action="talk"><span class="ac-ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 0 1-11.6 7.1L4 20l1-3.9A8 8 0 1 1 20 12Z"/></svg></span><span class="ac-t">直接说</span><span class="ac-d">别的事，打字告诉我就行</span></div>'
+          + '</div>';
+      } else if (type === 'stay') { // 设置/家/管理中心一键直达,坐下保留
+        subPanelContent.innerHTML = '<div class="menu-title">想让我怎么陪?</div>'
+          + '<div class="menu-item" data-action="home">🏠 打开 TA 的家</div>'
+          + '<div class="menu-item" data-action="manage">⚙️ 打开管理中心</div>'
+          + '<div class="menu-item" data-action="me">👤 个性化</div>'
+          + '<div class="menu-item" data-action="stay-sit">☕ 就在这儿静静陪着</div>';
+      } else if (type === 'size') {   // 三档预设（⌥滚轮微调是另一条路）
+        const cur = nearestSizeWord(H);
+        subPanelContent.innerHTML = '<div class="menu-title">多大合适？（也可以 ⌥滚轮微调）</div>'
+          + `<div class="menu-item${cur === '小' ? ' on' : ''}" data-size="small">🐤 小</div>`
+          + `<div class="menu-item${cur === '中' ? ' on' : ''}" data-size="mid">🐰 中</div>`
+          + `<div class="menu-item${cur === '大' ? ' on' : ''}" data-size="large">🐻 大</div>`
+          + `<div class="menu-title" id="size-now">现在：${cur} —— 桌面上马上就变，可以接着调</div>`;
+      } else if (type === 'more') {
+        /* 三组重排 + **去重**。两处判断写在这里，别处别再各写一份：
+           ① 「记忆」只从这儿进（环上那颗撤了）；
+           ② **「看看我的屏幕」「帮我安排」不在这儿**——它们本来就活在「帮我做事」的能力卡里，
+              两侧各一份会重复。所以「她替你做」这一组只剩「出镜」。 */
+        subPanelContent.innerHTML = '<div class="menu-title">她的样子</div>'
+          + '<div class="menu-item" data-action="me-look">👗 外观</div>'
+          + '<div class="menu-item" data-action="me-voice">🔊 声音</div>'
+          + '<div class="menu-item" data-action="size">📏 大小</div>'
+          + '<div class="menu-title">她替你做</div>'
+          + '<div class="menu-item" data-action="stage">🎥 出镜</div>'
+          + '<div class="menu-title">去别处</div>'
+          + '<div class="menu-item" data-action="memory">🧠 记忆</div>'
+          + '<div class="menu-item" data-action="me">👤 个性化</div>'
+          + '<div class="menu-item" data-action="backup">💾 备份</div>'
+          + '<div class="menu-item" data-action="quit">⏻ 退出</div>';
+      } else if (type === 'outfit') {
+        subPanelContent.innerHTML = renderOutfitHTML();
+      } else if (type === 'screen-perm') {
+        subPanelContent.innerHTML = '<div class="menu-title">👀 TA 要看一次你的屏幕，可以吗？</div>'
+          + '<div class="menu-item" data-action="screen-yes">👀 可以，看看吧</div>'
+          + '<div class="menu-item" data-action="screen-no">先不了</div>';
+      } else if (type === 'quit') {
+        subPanelContent.innerHTML = '<div class="menu-title">🚪 确定要让 TA 离开吗？</div>'
+          + '<div class="menu-item" data-action="quit-confirm">⏻ 确定退出</div>'
+          + '<div class="menu-item" data-action="quit-cancel">💜 再陪陪我</div>';
+      }
+      subPanel.hidden = false;
+      positionSubPanel();
+    }
+    /* **「动作」菜单整块删掉**：手选动作这条链没了——
+       原地动作改由她自己按心情挑（见 idlePicker），
+       播放链走同一条 `pet-action` IPC（主进程 echo → 本窗 onPetAction 播放）。
+       ⚠ 只删"手选"这一层，`pet-live2d.js` 的播放实现留着。 */
+    // 子面板导航类 action——分流到对应能力
+    let screenPermOk = false; // 首次「看看我的屏幕」需确认(权限感知;流程:确认→TA 看屏幕→分析→播报)
+    const NAV_ACTIONS = {
+      size: () => openSubPanel('size'),   // 📏 大小
+      file: () => { subPanel.hidden = true; closeIconPanel(); window.api.petFileTask(); }, // 📄 帮我处理文件
+      screen: () => {
+        subPanel.hidden = true;
+        if (screenPermOk) { closeIconPanel(); doScreenLook(); return; }
+        openSubPanel('screen-perm'); // 首次:权限确认(两步内可达)
+      },
+      arrange: () => { // ⏰ 帮我安排：开「帮我安排」三页（提醒/日程/计划）
+        subPanel.hidden = true; closeIconPanel();
+        window.api.arrangeOpen?.();
+      },
+      talk: () => { subPanel.hidden = true; closeIconPanel(); openChat(); }, // 🧩 其他事情(直接说)
+      memory: () => { subPanel.hidden = true; closeIconPanel(); window.api.meOpen('memory'); }, // 🧠 记忆（环上那颗撤了 → 现在只从「更多 → 去别处」进）
+      outfit: () => openSubPanel('outfit'),
+      stage: () => { subPanel.hidden = true; closeIconPanel(); window.api.stageOpen(); }, // 🎥 出镜
+      me: () => { subPanel.hidden = true; closeIconPanel(); window.api.meOpen('home'); }, // 👤 个性化
+      home: () => { subPanel.hidden = true; closeIconPanel(); window.api.homeOpen(); }, // 🏠 TA 的家
+      manage: () => { subPanel.hidden = true; closeIconPanel(); window.api.manageOpen(); }, // ⚙️ 管理中心
+      'stay-sit': () => { // ☕ 原「陪我待会」坐下行为保留(设置入口+保留坐下)
+        subPanel.hidden = true; closeIconPanel();
+        window.api.petAction('sit');   // ☕ 陪我待会 = 坐下（手选动作删了，这条保留）
+        showBubble('好,我就在这儿陪着你~', 'comfort', 4200);
+      },
+      'screen-yes': () => { screenPermOk = true; subPanel.hidden = true; closeIconPanel(); doScreenLook(); },
+      'screen-no': () => { subPanel.hidden = true; showBubble('好，你想让我看的时候说一声就好。', 'neutral', 3000); },
+      'me-voice': () => { subPanel.hidden = true; closeIconPanel(); window.api.meOpen('home', 'voice'); }, // 🔊 声音 → 个性化·声音
+      // 「一处设置、一处看」：换形象是**改** → 去设置页的外观（个性化页里只留现在用的是哪个）
+      'me-look': () => { subPanel.hidden = true; closeIconPanel(); window.api.manageOpen?.({ page: 'look' }); },
+      backup: () => {
+        subPanel.hidden = true; closeIconPanel();
+        window.api.backupExport().then((r) => {
+          showBubble(r.ok ? '备份包已导出,收好它' : DT('pet.js.tpl.3', '备份没成功:{p1}', { p1: r.error ?? '' }), 'neutral', 5000);
+        });
+      },
+      quit: () => openSubPanel('quit'),
+    };
+    /** 👀 看屏幕执行:预告→截图分析→气泡播报(TA 看屏幕→分析→「我看到了……」) */
+    function doScreenLook() {
+      showBubble('好,我看看你的屏幕——', 'knowledge', 2600);
+      setTimeout(() => handleScreenshot(), 700);
+    }
+    function handleSubItemClick(item) {
+      const size = item.dataset.size;
+      if (size) {                                   // 三档预设
+        /* 三处约束：
+           ① **选完不再关面板**（否则想再试一档得重新双击她）；
+           ② 与 ⌥滚轮走**同一个锚点**（见 applySizeKeepingFeet）；
+           ③ 气泡只说人话档位，**不念像素**（不说具体尺寸数字）。 */
+        setStageHeight(PET_PRESETS[size] ?? PET_PRESETS.mid);
+        for (const el of subPanelContent.querySelectorAll('[data-size]')) el.classList.toggle('on', el.dataset.size === size);
+        const now = document.getElementById('size-now');
+        if (now) now.textContent = DT('pet.js.tpl.4', '现在：{p1} —— 桌面上马上就变，可以接着调', { p1: SIZE_WORDS[size] ?? '中' });
+        showBubble(DT('pet.js.tpl.5', '好，就这个大小：{p1}', { p1: SIZE_WORDS[size] ?? '中' }), 'neutral', 2200);
+        return;
+      }
+      const expr = item.dataset.expr;
+      if (expr) { petLive2d?.setExpression?.(expr); return; } // 表情不关面板，连续试
+      const actionName = item.dataset.action;
+      if (actionName && NAV_ACTIONS[actionName]) { NAV_ACTIONS[actionName](); return; }
+      // 换装项
+      const l2dId = item.dataset.l2d;
+      if (l2dId) {
+        subPanel.hidden = true;
+        window.api.live2dSetModel(l2dId).then((r) => {
+          if (r.ok) {
+            window.__l2dActive = l2dId;
+            showBubble(DT('pet.js.tpl.6', '✨ 换形象：{p1}…', { p1: r.model?.label ?? l2dId }), 'neutral', 4000);
+          } else {
+            showBubble(DT('pet.js.tpl.7', '换形象失败：{p1}', { p1: r.error ?? '' }), 'neutral', 5000);
+          }
+        });
+        return;
+      }
+      const partId = item.dataset.part;
+      if (partId) {
+        const map = readParts();
+        const now = (map[partId] ?? 1) >= 1 ? 0 : 1;
+        if (now >= 1) delete map[partId]; else map[partId] = now;
+        writeParts(map);
+        petLive2d?.setPartOverride?.(partId, now);
+        item.firstChild.textContent = (now >= 1 ? '✅ ' : '⬜ ');
+        return;
+      }
+      const outfitId = item.dataset.outfit;
+      if (outfitId) {
+        subPanel.hidden = true;
+        iconPanel.hidden = true;
+        window.api.outfitWear(outfitId).then((r) => {
+          showBubble(r.ok ? DT('pet.js.tpl.8', '👗 已换上「{p1}」', { p1: r.name }) : DT('pet.js.tpl.9', '换装失败：{p1}', { p1: r.error ?? '' }), r.ok ? 'joy' : 'neutral', 5000);
+        });
+      }
+    }
+
+    // ---- 换装渲染 ----
+    let profileData = null;
+    const partsKey = () => 'l2dParts.' + (window.__l2dActive ?? '');
+    function readParts() { try { return JSON.parse(localStorage.getItem(partsKey())) || {}; } catch { return {}; } }
+    function writeParts(map) { try { localStorage.setItem(partsKey(), JSON.stringify(map)); } catch { /* 存储满忽略 */ } }
+    function applySavedParts() {
+      for (const [id, v] of Object.entries(readParts())) petLive2d?.setPartOverride?.(id, v);
+    }
+    function renderOutfitHTML() {
+      const l2dModels = window.__l2dModels ?? [];
+      const parts = petLive2d?.costumeParts?.() ?? [];
+      const partsMap = readParts();
+      const items = profileData?.wardrobe ?? [];
+      const l2dHtml = (petLive2d && l2dModels.length)
+        ? '<div class="menu-title">👯 形象（角色库，点击即换）</div>'
+          + l2dModels.map((m) => `<div class="menu-item" data-l2d="${m.id}">🧍‍♀️ ${m.label}${m.id === window.__l2dActive ? ' ✓' : ''}</div>`).join('')
+        : '';
+      const partsHtml = parts.length
+        ? '<div class="menu-title">👗 服装部件（同一角色显隐切换）</div>'
+          + parts.map((p) => `<div class="menu-item" data-part="${p.id}">${((partsMap[p.id] ?? 1) >= 1) ? '✅' : '⬜'} ${p.id}</div>`).join('')
+        : '';
+      const wardrobeHtml = items.length
+        ? '<div class="menu-title">🧺 穿搭档案</div>'
+          + items.map((i) => `<div class="menu-item" data-outfit="${i.id}">${i.category === 'accessory' ? '🧣' : i.category === 'dress' ? '👗' : i.category === 'bottom' ? '👖' : '👕'} ${i.name}</div>`).join('')
+        : '';
+      return (l2dHtml + partsHtml + wardrobeHtml)
+        || '<div class="menu-title">当前模型没有可切换的服装部件——用 Cubism Editor 定制带多套服装的模型后自动出现</div>';
+    }
+
+    // ---- 截图处理 ----
+    function handleScreenshot() {
+      showUploadAnim();
+      av()?.setEmotion?.('knowledge');
+      window.api.petScreenshot?.().then((r) => {
+        hideUploadAnim();
+        if (r?.ok) {
+          showBubble(DT('pet.js.tpl.10', '📸 已截取屏幕，正在分析…'), 'knowledge', 5000);
+        } else {
+          showBubble(DT('pet.js.tpl.11', '截图失败：{p1}', { p1: r?.error ?? '未知错误' }), 'neutral', 5000);
+        }
+      }).catch(() => {
+        hideUploadAnim();
+        showBubble('截图功能暂不可用', 'neutral', 4000);
+      });
+    }
+    function showUploadAnim() { uploadAnim.classList.add('show'); }
+    function hideUploadAnim() { uploadAnim.classList.remove('show'); }
+
+    // ---- 拖放文件/目录到数字人 ----
+    let dragCounter = 0;
+    wrap.addEventListener('dragenter', (e) => {
+      e.preventDefault();
+      if (!e.dataTransfer?.types?.includes('Files')) return;
+      dragCounter++;
+      dropOverlay.classList.add('active');
+    });
+    wrap.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+    });
+    wrap.addEventListener('dragleave', () => {
+      dragCounter--;
+      if (dragCounter <= 0) {
+        dragCounter = 0;
+        dropOverlay.classList.remove('active');
+      }
+    });
+    wrap.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dragCounter = 0;
+      dropOverlay.classList.remove('active');
+      const files = e.dataTransfer?.files;
+      if (!files || !files.length) return;
+      // File.path 在 Electron 33 已移除（否则拖进来静默无反应）——
+      // 改走 preload 的 webUtils.getPathForFile；真拿不到就出声，别静默 return。
+      const paths = [];
+      for (const f of files) { const p = window.api.getPathForFile?.(f) ?? ''; if (p) paths.push(p); }
+      if (!paths.length) { showBubble('没读到拖进来的文件路径，试试点文件按钮选一个', 'neutral', 4000); return; }
+      // 上传动画 + 交给主进程处理
+      showUploadAnim();
+      av()?.setEmotion?.('knowledge');
+      av()?.playAction?.('think');
+      window.api.petFileDrop?.(paths).then((r) => {
+        hideUploadAnim();
+        if (r?.ok) {
+          const cnt = paths.length;
+          const isDir = paths.length === 1 && paths[0].endsWith('/');
+          showBubble(DT('pet.js.tpl.12', '📄 已收到 {p1} 个{p2}，正在处理…', { p1: cnt, p2: isDir ? '目录' : '文件' }), 'knowledge', 5000);
+        }
+      }).catch(() => {
+        hideUploadAnim();
+        showBubble('文件处理出错', 'neutral', 4000);
+      });
+    });
+
+    // ---- 鼠标接管：悬停角色 → 暂停漫步、可点可拖 + 提示；离开 → 恢复漫步 + 点击穿透 ----
+    let inside = false;
+    /** 命中一个矩形（隐藏/无尺寸的元素不算命中）。铁律：**任何浮层都要走这里** */
+    function rectHit(el, x, y, pad) {
+      if (!el || el.hidden) return false;
+      const b = el.getBoundingClientRect();
+      if (!b.width && !b.height) return false;
+      return x >= b.left - pad && x <= b.right + pad && y >= b.top - pad && y <= b.bottom + pad;
+    }
+    function hitTest(x, y) {
+      const r = wrap.getBoundingClientRect();
+      // Live2D 模式：紧贴模型画布，零外扩消除透明层感（放大时不该有隐形框框）
+      const pad = document.body.classList.contains('live2d-active') ? 0 : 18;
+      if (x >= r.left - pad && x <= r.right + pad && y >= r.top - pad && y <= r.bottom + pad) return true;
+      // 图标面板区域接管（面板打开时鼠标移到面板不掉线）
+      if (!iconPanel.hidden) {
+        const ipr = iconPanel.getBoundingClientRect();
+        if (x >= ipr.left - 10 && x <= ipr.right + 10 && y >= ipr.top - 10 && y <= ipr.bottom + 10) return true;
+        // ⚠ 真机根因：环绕小钮**溢出** iconPanel 的矩形——iconPanel 是 inset:0（正好她本体），
+        //   四颗钮**全都落在本体之外**；getBoundingClientRect **不含溢出的子元素**
+        //   → 鼠标一移到外圈钮上就被判 pet-leave → 整窗点击穿透（setIgnoreMouseEvents）
+        //   → **点钮的点击从她身上漏给了背后的应用**：点 ☕ 可能把别的应用唤到前台；
+        //   落在桌面上则触发 macOS「点击墙纸显示桌面」，整个 Space 的窗口被扫走。
+        //   （用 sendInputEvent 注入事件**绕过系统级穿透判定**，复现不出来；只有真鼠标点击才会漏下去。）
+        for (const btn of iconPanel.querySelectorAll('.orb-btn')) if (rectHit(btn, x, y, 4)) return true;
+      }
+      // 子面板绝对定位在图标面板上方，溢出 iconPanel 矩形（getBoundingClientRect 不含溢出子元素），
+      // 也超出角色矩形（Live2D pad=0）——鼠标移入子面板上部区域 → 误判 pet-leave → 整窗点击穿透 →
+      // 动作面板顶部条目点了没反应。任何新浮层必须纳入 hitTest（铁律）。
+      if (rectHit(subPanel, x, y, 10)) return true;
+      // 审批气泡浮层同样纳入命中并集（点击穿透铁律：任何新浮层必须 hitTest 接管）
+      if (rectHit(approvalCard, x, y, 10)) return true;
+      // 任务条（工作模式·她脚边）**显式并入**。它贴她盒子底、落在盒内，
+      // 本来已被上面的 wrap 矩形覆盖——这行是**兜底**：万一以后被挪到本体之外，
+      // 不至于重演"鼠标移上去整窗穿透、点击漏给背后应用"那条坑。
+      if (rectHit(taskbar, x, y, 4)) return true;
+      return false;
+    }
+    window.__petHit = hitTest;   // 自检通道：每颗钮的中心都在可点击区内
+    // 自检通道：环的度量（看得见的高度 / 中心偏移 / 来源）——"锚到看得见的她"靠它断言
+    window.__ringMetrics = () => ({ ...ringMetrics, css: {
+      ringH: getComputedStyle(document.documentElement).getPropertyValue('--ring-h').trim(),
+      ringCy: getComputedStyle(document.documentElement).getPropertyValue('--ring-cy').trim(),
+    } });
+    window.addEventListener('mousemove', (e) => {
+      if (dragging) return;
+      const hit = hitTest(e.clientX, e.clientY);
+      if (hit !== inside) {
+        inside = hit;
+        if (hit) {
+          wrap.classList.add('hovered');
+          window.api.petEnter();
+        } else {
+          wrap.classList.remove('hovered');
+          window.api.petLeave();
+        }
+      }
+    });
+    window.api.petLeave();
+
+    /* ---- **⌥滚轮**微调大小（220~400），换档后落回最近一档 ----
+       ⚠ 必须按 ⌥：普通滚轮在她身上滚一下就改尺寸是误触（用户只想滚页面）。
+       尺寸改了之后立刻夹回边界（大了也看得见她）。 */
+    window.addEventListener('wheel', (e) => {
+      if (!e.altKey || !inside || panelsOpen() || dragging || press) return;
+      e.preventDefault();
+      const step = e.ctrlKey ? 4 : 20;                    // ⌥⌃滚轮 = 微调
+      // 与三档点选**同一条路**（脚为锚）：以前这里是 `pos * 比例`，两条路她停的位置不一样
+      applySizeKeepingFeet(H + (e.deltaY < 0 ? step : -step));
+    }, { passive: false });
+
+    // ---- 形象引擎（Live2D 唯一方案） ----
+    function populateExpressions() { /* 表情列表在子面板动态渲染，无需预填充 */ }
+
+    async function initLive2d() {
+      if (mode !== 'live2d') return false;
+      try {
+        let waited = 0;
+        while (!window.PETL2D?.supported() && waited < 15000) {
+          await new Promise((r) => setTimeout(r, 100)); waited += 100;
+        }
+        if (!window.PETL2D?.supported()) throw new Error('live2d 库未就绪');
+        const list = await window.api.live2dModels?.().catch(() => null);
+        const active = list?.models?.find((m) => m.id === list.active) ?? list?.models?.[0];
+        if (!active) throw new Error('本地无 Live2D 模型');
+        window.__l2dModels = list.models;
+        window.__l2dActive = active.id;
+        orb.style.display = 'none';
+        glCanvas.hidden = false;
+        glCanvas.style.width = '100%';
+        glCanvas.style.height = '100%';
+        document.body.classList.add('live2d-active');
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        glCanvas.width = Math.round(charW * dpr);
+        glCanvas.height = Math.round(charH * dpr);
+        petLive2d = window.PETL2D.create(glCanvas);
+        window.__petl2d = petLive2d;
+        petLive2d.resize(glCanvas.width, glCanvas.height);
+        const ok = await new Promise((resolve) => {
+          petLive2d.loadModel('l2d://local/' + active.file, (loaded) => resolve(loaded));
+          setTimeout(() => resolve(false), 30000);
+        });
+        window.__petL2d = ok;
+        if (!ok) throw new Error('模型加载失败：' + (window.__l2dErr ?? ''));
+        window.__petReady = true;
+        syncRingMetrics();   // 模型到位了才量得准"看得见的她"
+        applySavedParts();
+        window.api.petProfile?.().then((p) => { if (p?.ok) profileData = p; }).catch(() => {});
+        return true;
+      } catch (e) {
+        try { window.__l2dInitErr = String(e?.message ?? e); } catch { /* 忽略 */ }
+        document.body.classList.remove('live2d-active');
+        petLive2d?.dispose?.(); petLive2d = null;
+        glCanvas.hidden = true;
+        orb.style.display = '';
+        window.__petReady = true;
+        return false;
+      }
+    }
+    initLive2d();
+
+    // ---- 说话气泡 + 情绪表达 ----
+    /* 形象端气泡的**轻量排版**。
+       窗口小、又贴着桌面，所以只做"可读化"：标题变粗、列表变 ·、行内代码/加粗保留、表格摊平——
+       不搬家页那套完整渲染（这边没有 components.js，也不该为一条气泡引整套样式）。
+       安全：先转义再变换，只产出 <strong>/<code>/<br>。 */
+    function escPet(t) {
+      return String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    function petMd(text) {
+      const src = String(text ?? '').replace(/\r\n?/g, '\n');
+      const out = [];
+      for (const raw of src.split('\n')) {
+        const line = raw.trim();
+        if (!line) continue;
+        // 表格：摊平成 "A：B" 行（小气泡里画不出表格）
+        if (/^\|.*\|$/.test(line)) {
+          const cells = line.replace(/^\||\|$/g, '').split('|').map((c) => c.trim()).filter(Boolean);
+          if (cells.length && !/^[-:\s]+$/.test(cells.join(''))) out.push(`· ${cells.map(escPet).join('｜')}`);
+          continue;
+        }
+        const h = /^#{1,6}\s+(.*)$/.exec(line);
+        if (h) { out.push(`<strong>${escPet(h[1])}</strong>`); continue; }
+        const li = /^(?:[-*+]|\d+\.)\s+(.*)$/.exec(line);
+        if (li) { out.push(`· ${escPet(li[1])}`); continue; }
+        out.push(escPet(line));
+      }
+      return out.join('<br>')
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>');
+    }
+
+    /** 气泡是 wrap 的第一个孩子（在流里）——它一出现/消失，舞台就整体上下挪一个气泡的高度
+     *  （**说一句话她整个人往下掉**，实测 53px）。
+     *  这里统一把她的**脚**钉住（与改尺寸同一个锚点），气泡只往上长、不动她。 */
+    function keepFeetDuring(fn) {
+      const before = stage.getBoundingClientRect();
+      fn();
+      const after = stage.getBoundingClientRect();
+      const dx = (before.left + before.width / 2) - (after.left + after.width / 2);
+      const dy = before.bottom - after.bottom;
+      if (Math.abs(dx) >= 0.5 || Math.abs(dy) >= 0.5) place(pos.x + dx, pos.y + dy, false);
+    }
+    function showBubble(text, emotion = 'neutral', dur = 9000) {
+      lastEmotion = emotion;   // 她自己挑动作时按这个加权（joy 更爱挥手）
+      bubble.className = `bubble${['joy', 'angry', 'comfort'].includes(emotion) ? ` ${emotion}` : ''}`; // 情绪着色边框
+      keepFeetDuring(() => {
+        bubble.innerHTML = petMd(text);
+        bubble.hidden = false;
+      });
+      wrap.classList.remove('emotion-comfort', 'emotion-knowledge');
+      if (emotion === 'comfort') wrap.classList.add('emotion-comfort');
+      else if (emotion === 'knowledge') wrap.classList.add('emotion-knowledge');
+      wrap.classList.remove('idle');
+      wrap.classList.add('talking');
+      av()?.setEmotion(emotion);
+      av()?.setState({ talking: true });
+      clearTimeout(bubble._t);
+      bubble._t = setTimeout(() => {
+        keepFeetDuring(() => { bubble.hidden = true; });   // 气泡收起也别让她弹一下
+        wrap.classList.remove('talking');
+        av()?.setState({ talking: false });
+        if (!dragging && !press) wrap.classList.add('idle');
+      }, dur);
+    }
+    window.api.onBubble((data) => {
+      const text = typeof data === 'string' ? data : (data && data.text) || '';
+      const emotion = (data && typeof data === 'object' && data.emotion) || 'neutral';
+      showBubble(text, emotion);
+    });
+
+    // ---- 审批气泡（brain 工具审批请求 → 允许/拒绝回执） ----
+    window.api.onApprovalAsk?.((d) => {
+      approvalCard._id = d.id;
+      // 人话标题 + 为什么问你 + 影响面；原始命令折叠起来
+      const tEl = document.getElementById('ap-title');
+      if (tEl) tEl.textContent = d.title || 'TA 想做';
+      const whyEl = document.getElementById('ap-why');
+      if (whyEl) { whyEl.textContent = d.why ?? ''; whyEl.hidden = !d.why; }
+      const impEl = document.getElementById('ap-imp');
+      if (impEl) { impEl.textContent = d.impact ? DT('pet.js.tpl.13', '影响：{p1}', { p1: d.impact }) : ''; impEl.hidden = !d.impact; }
+      const rawT = document.getElementById('ap-rawt');
+      const raw = d.raw ?? d.summary ?? '';
+      if (rawT) rawT.hidden = !raw;
+      apCmd.hidden = true;                       // 原始内容默认收起
+      if (rawT) rawT.onclick = () => { apCmd.hidden = !apCmd.hidden; rawT.textContent = apCmd.hidden ? '看原始命令' : '收起'; };
+      // R5（不可逆）不给「到对话结束」这一档；**缺字段时按风险档推断**（fail-safe：
+      // 老调用方/桩没带 canSession 时，不能因为"没说不许"就把它放出来）
+      const canSession = typeof d.canSession === 'boolean' ? d.canSession : d.risk !== 'R5';
+      const ruleBtn = document.getElementById('ap-rule-btn');
+      const canRule = d.canRule === true;    // 宿主给不出窄规矩 = 不给这颗按钮（fail-safe：只认 true）
+      if (ruleBtn) ruleBtn.hidden = !canRule;
+      const ruleNote = document.getElementById('ap-rule');
+      if (ruleNote) {
+        ruleNote.hidden = !(canRule && d.ruleNote);
+        ruleNote.textContent = canRule && d.ruleNote ? DT('pet.js.tpl.14', '记下的规矩：{p1}（随时能在设置里删掉）', { p1: d.ruleNote }) : '';
+      }
+      const sessRow = document.getElementById('ap-session-row');
+      if (sessRow) sessRow.hidden = !canSession && !canRule;
+      apCmd.textContent = raw;
+      // 风险徽章——**用内核那一档**出人话，界面不再自己猜；
+      //   内部标识一律不上屏（档位靠人话词 + 颜色表达）。词表在 state-words.js（两处共用一份）。
+      const riskEl = document.getElementById('ap-risk');
+      const W = globalThis.TaskWords ?? {};
+      riskEl.textContent = (W.riskWord ?? (() => '会删东西'))(d.risk);
+      riskEl.className = 'ap-risk r-' + (W.riskSeverity ?? (() => 'high'))(d.risk) + (d.risk === 'R5' ? ' r-mandatory' : '');
+      approvalCard.hidden = false;
+      clearTimeout(approvalCard._t);
+      // 主进程 60s 自动拒绝，UI 同步收起
+      approvalCard._t = setTimeout(() => { approvalCard.hidden = true; }, 60 * 1000);
+    });
+    function answerApproval(decision) {
+      if (approvalCard._id) window.api.approvalAnswer?.(approvalCard._id, decision);
+      approvalCard.hidden = true;
+      approvalCard._id = null;
+      clearTimeout(approvalCard._t);
+    }
+    approvalCard.addEventListener('click', (e) => {
+      const btn = e.target.closest('.ap-btn');
+      if (!btn) return;
+      // 三种答复（deny / allow=就这一次 / session=到这次对话结束都允许）
+      const map = { deny: 'deny', allow: 'allow', session: 'allow-session', rule: 'allow-rule' };
+      answerApproval(map[btn.dataset.ap] ?? 'deny');
+    });
+    // 别的窗口答完了 → 这边同一张卡也收起（宿主广播 approval-resolved）
+    window.api.onApprovalResolved?.((d) => {
+      if (!d?.id || d.id === approvalCard._id) { approvalCard.hidden = true; approvalCard._id = null; }
+    });
+
+    // ---- 云端语音播放 ----
+    let audioQueue = [];
+    let currentAudio = null;
+    function playNextAudio() {
+      const seg = audioQueue.shift();
+      if (!seg) { currentAudio = null; av()?.setState({ talking: false }); return; }
+      try {
+        const bytes = Uint8Array.from(atob(seg.base64), (c) => c.charCodeAt(0));
+        const blob = new Blob([bytes], { type: 'audio/mpeg' });
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audio.playbackRate = seg.prosody?.rate ?? 1;
+        audio.volume = seg.prosody?.volume ?? 1;
+        currentAudio = audio;
+        av()?.setState({ talking: true });
+        petLive2d?.attachAudio?.(audio);
+        const done = () => { URL.revokeObjectURL(url); playNextAudio(); };
+        audio.onended = done;
+        audio.onerror = done;
+        audio.play().catch(done);
+      } catch { playNextAudio(); }
+    }
+    window.api.onPetAudio((a) => {
+      if (!a) return;
+      const segs = Array.isArray(a.segments) && a.segments.length ? a.segments : (a.base64 ? [a] : []);
+      if (!segs.length) return;
+      if (currentAudio) { try { currentAudio.pause(); } catch { /* 忽略 */ } currentAudio = null; }
+      audioQueue = segs;
+      playNextAudio();
+    });
+
+    // ---- 系统音色本地播报：speechSynthesis 出声（符合人物设定的 macOS 系统音色），嘴型走说话假动画 ----
+    window.api.onPetSpeechLocal?.(({ text, voice } = {}) => {
+      if (!text || !window.LH_SPEECH) return;
+      av()?.setState({ talking: true });
+      // 音色由 ui/speech.js 决定：给的名字找不到（或为空）→ 挑**中文女声**，不再落到系统默认
+      //（系统默认曾落到男声，听感差）。挑不到也会在 diag 里留痕。
+      Promise.resolve(window.LH_SPEECH.speakLocal(text, voice, { onEnd: () => av()?.setState({ talking: false }) })).then((r) => {
+        try { window.api.petDiag?.(`speakLocal voice=${r?.voice || '(默认)'} fallback=${r?.fallback === true} voices=${r?.voices ?? '?'}`); } catch { /* 老宿主 */ }
+        if (!r?.ok) av()?.setState({ talking: false });
+      });
+    });
+
+    // ---- 打开应用特效 ----
+    window.api.onPetEffect((e) => {
+      if (e?.type === 'celebrate') av()?.celebrate?.();
+    });
+
+    // ---- 动作面板事件（主进程转发） ----
+    window.api.onPetAction((name) => {
+      av()?.playAction?.(name);
+    });
+
+    // ---- Live2D 模型切换 ----
+    window.api.onPetLive2dModel?.((id) => {
+      const m = (window.__l2dModels ?? []).find((x) => x.id === id);
+      if (!m || !petLive2d) return;
+      window.__l2dActive = id;
+      petLive2d.loadModel('l2d://local/' + m.file, (ok) => {
+        window.__petL2d = ok;
+        showBubble(ok ? DT('pet.js.tpl.15', '✨ 换上「{p1}」啦', { p1: m.label }) : DT('pet.js.tpl.16', '换形象失败：{p1} 未加载成功', { p1: m.label }), ok ? 'joy' : 'neutral', 5000);
+        if (ok) {
+          applySavedParts();
+          av()?.playAction?.('celebrate');
+        }
+      });
+    });
+
+    // ---- 眼神升级 ----
+    window.api.onPetLook?.(({ x, y, ms } = {}) => {
+      if (typeof x !== 'number' || typeof y !== 'number') return;
+      petLive2d?.lookAt?.(x, y, ms ?? 6000);
+    });
+
+    // ---- 屏幕观察结果（数字人看到了什么 → 主动说话） ----
+    window.api.onScreenObserve?.((text) => {
+      if (text) av()?.setEmotion?.('knowledge');
+    });
+
+    // ---- 管理中心 / 输入弹层的开关只用来记状态（已经不走动，"恢复走动"整套删掉）----
+    window.api.onManageClosed?.(() => { settingsOpen = false; });
+    window.api.onQuickVisible?.((visible) => { quickOpen = visible === true; });
+
+    // ---- 自检通道（回归断言：浮层点击穿透命中 / 接管状态） ----
+    window.__hitAt = (x, y) => hitTest(x, y);
+    window.__inside = () => inside;
+  </script>
+</body>
+</html>

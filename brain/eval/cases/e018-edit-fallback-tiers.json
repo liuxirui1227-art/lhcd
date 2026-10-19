@@ -1,0 +1,37 @@
+{
+  "id": "e018",
+  "name": "edit 降级匹配：原文是全角引号/行尾空格 → 归一档命中，且**在话术里说破用哪一档**（去核对）",
+  "setup": {
+    "files": {
+      "note.md": "# 纪要\n他说“先不改预算”  \n其余照旧\n"
+    }
+  },
+  "sessions": [
+    {
+      "task": "把 note.md 里那句预算的话改掉",
+      "script": [
+        {
+          "calls": [
+            {
+              "id": "c1",
+              "name": "edit",
+              "args": {
+                "path": "note.md",
+                "oldString": "他说\"先不改预算\"",
+                "newString": "他说“预算先按原样”"
+              }
+            }
+          ]
+        },
+        { "text": "改好了" }
+      ]
+    }
+  ],
+  "checks": [
+    { "type": "tool-result-contains", "contains": "标点/空格归一" },
+    { "type": "tool-result-contains", "contains": "请核对" },
+    { "type": "file-content", "path": "note.md", "contains": "预算先按原样" },
+    { "type": "file-content", "path": "note.md", "notContains": "先不改预算" },
+    { "type": "event-contains", "event": "artifact.created", "contains": "note.md" }
+  ]
+}

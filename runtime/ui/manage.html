@@ -1,0 +1,2530 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title data-i18n="manage.page.1">TA 管理中心 · 灵核</title>
+<link rel="stylesheet" href="./ui.css">
+  <style>
+    /* 管理中心视觉：按「灵核家」(Home)同一视觉系统:亮底+白卡+紫点缀+深浅色自动;
+       类名/结构/JS 全保留(开发者模式功能不变)。 */
+    /* 左导航「每一项=一页」+ 右侧大标题/小标题/圆角容器装行（mg- 前缀：
+       ⚠ 本页 link 了 ui.css，自己的类名必须避开它的顶层规则 —— 曾被 .sw 撞过一次）。
+       左导航同时解决「一页长卡」：内容区自己滚，不再整页滚。 */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; }
+    body { font-family: var(--font); color: var(--ink); background: var(--bg); overflow: hidden; }
+
+    .mg-app { display: grid; grid-template-columns: 236px 1fr; height: 100vh; }
+
+    /* ---------- 左导航 ---------- */
+    .mg-nav { border-right: 1px solid var(--line); padding: 12px 10px 24px; overflow-y: auto;
+      background: linear-gradient(180deg, var(--pri-a05), transparent 220px), var(--bg); }
+    .mg-back { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--ink);
+      padding: 7px 9px; border-radius: 8px; cursor: pointer; }
+    .mg-back:hover { background: var(--row); }
+    .mg-search { margin: 10px 4px 6px; display: flex; align-items: center; gap: 7px;
+      background: var(--row); border: 1px solid var(--line); border-radius: 9px; padding: 6px 10px;
+      font-size: 12.5px; color: var(--ink2); }
+    .mg-search input { font: inherit; font-size: 12.5px; border: none; background: none; outline: none;
+      color: var(--ink); width: 100%; min-width: 0; }
+    .mg-grp { margin: 14px 0 4px; padding-left: 10px; font-size: 11px; color: var(--ink2); letter-spacing: 1px; }
+    .mg-item { display: flex; align-items: center; gap: 9px; font-size: 13.5px; padding: 7px 10px;
+      border-radius: 8px; cursor: pointer; color: var(--ink); }
+    .mg-item:hover { background: var(--row); }
+    .mg-item[aria-current="true"] { background: var(--row); font-weight: 600; }
+    .mg-item .ic { width: 16px; display: grid; place-items: center; color: var(--ink2); }
+    .mg-item[aria-current="true"] .ic { color: var(--accent); }
+
+    /* ---------- 右内容 ---------- */
+    .mg-body { padding: 32px 42px 60px; overflow-y: auto; }
+    .mg-page { max-width: 780px; display: none; }
+    .mg-page.on { display: block; }
+    .mg-h1 { font-size: 26px; font-weight: 700; letter-spacing: .5px; }
+    .mg-sub { margin-top: 8px; font-size: 13px; line-height: 1.7; color: var(--ink2); }
+    .mg-status { margin-top: 10px; font-size: 12.5px; color: var(--ink2); }
+    .mg-status:empty { display: none; }
+    .mg-sec { margin-top: 28px; }
+    .mg-sec > .h { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--ink); }
+    .mg-sec > .h .act { margin-left: auto; font-size: 12px; font-weight: 400; color: var(--ink2); }
+    .mg-box { margin-top: 10px; background: var(--card-solid); border: 1px solid var(--line);
+      border-radius: 12px; box-shadow: var(--shadow-soft); overflow: hidden; }
+    .mg-row { display: flex; align-items: center; gap: 16px; padding: 13px 16px; }
+    .mg-row + .mg-row { border-top: 1px solid var(--line); }
+    .mg-row .tx { min-width: 0; flex: 1; }
+    .mg-row .t { font-size: 13.5px; font-weight: 600; }
+    .mg-row .d { margin-top: 3px; font-size: 12px; line-height: 1.6; color: var(--ink2); overflow-wrap: anywhere; }
+    .mg-row .d b { color: var(--ink); }
+    .mg-row .ctl { flex: none; display: flex; align-items: center; gap: 8px; }
+    .mg-val { font-size: 12.5px; color: var(--ink2); font-variant-numeric: tabular-nums; }
+    .mg-val.strong { color: var(--ink); font-weight: 600; }
+    .mg-sel { font: inherit; font-size: 12.5px; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+      border-radius: 8px; padding: 5px 10px; display: inline-flex; align-items: center; gap: 7px; cursor: pointer; }
+    .mg-btn { font: inherit; font-size: 12.5px; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+      border-radius: 8px; padding: 5px 12px; cursor: pointer; }
+    .mg-btn:hover { background: var(--row); }
+    .mg-btn.pri { background: var(--grad); color: var(--white); border-color: transparent; box-shadow: 0 6px 16px var(--glow); }
+    .mg-btn.danger { color: var(--err-ink); }
+    .mg-note { margin-top: 10px; font-size: 12px; line-height: 1.7; color: var(--ink2);
+      background: var(--row); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+    .mg-note.warn { background: var(--warn-bg); color: var(--warn-ink); border-color: var(--warn-line); }
+    .mg-list { margin-top: 10px; }        /* = 原来的 .result / 动态列表容器，行内展示 */
+    .mg-list:empty { display: none; }
+    .mg-field { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--ink2); flex-wrap: wrap; }
+    .mg-field input, .mg-field select { font: inherit; font-size: 12.5px; color: var(--ink); background: var(--bg);
+      border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; }
+    .mg-field input.n { width: 62px; text-align: center; }
+    /* 技能/MCP 页签：沿用旧样式（页签是**静态 markup**，不是 JS 生成的，样式不能删） */
+    .st-tabs { display: flex; gap: 2px; background: var(--row); border-radius: var(--r-rect); padding: 2px; flex: none; }
+    .st-tb { font: inherit; font-size: 11px; padding: 4px 10px; border: none; border-radius: 4px; background: none;
+      color: var(--ink2); cursor: pointer; }
+    .st-tb.on { background: var(--grad); color: var(--white); font-weight: 600; }
+    .mg-icon { width: 26px; height: 26px; border-radius: 8px; flex: none; display: grid; place-items: center;
+      background: var(--row); font-size: 13px; }
+    /* 亲密条 */
+    .mg-bar { display: block; height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; width: 120px; }
+    .mg-bar i { display: block; height: 100%; background: var(--grad); }
+    /* 列表行（技能/MCP/大脑 共用一套骨架）：左图标方块 + 中标题/说明 + 右控件 */
+    /* 自定义大脑卡片（一行入口 → 分组表单） */
+    .cx-card { margin-top: 10px; background: var(--card-solid); border: 1px solid var(--line); border-radius: var(--radius-card); }
+    .cx-head { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px 14px; text-align: left; cursor: pointer; }
+    .cx-head:hover { background: var(--row); border-radius: var(--radius-card); }
+    .cx-head .cx-ic { font-size: 16px; flex: none; }
+    .cx-head .cx-tt { font-size: 13px; font-weight: 600; color: var(--ink); flex: 1; min-width: 0; }
+    .cx-head .cx-tt small { display: block; font-weight: 400; font-size: 11.5px; color: var(--ink2); margin-top: 2px; }
+    .cx-head .cx-caret { font-size: 11.5px; color: var(--ink2); flex: none; }
+    .cx-body { padding: 2px 14px 14px; border-top: 1px solid var(--line); }
+    .cx-grp { font-size: 11px; color: var(--muted); margin: 12px 0 6px; letter-spacing: .5px; }
+    .cx-field { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; }
+    .cx-field label { width: 52px; flex: none; font-size: 12px; color: var(--ink2); }
+    .cx-field input { flex: 1; min-width: 0; }
+    .cx-acts { display: flex; gap: 8px; margin-top: 12px; }
+
+    /* 24 小时时间轴（安静时段涂紫） */
+    .tl { position: relative; height: 18px; margin-top: 10px; border-top: 1px solid var(--line); }
+    .tl .q { position: absolute; top: -1px; height: 7px; background: var(--pri-a55); border-radius: 0 0 3px 3px; }
+    .tl .tick { position: absolute; top: 0; width: 1px; height: 5px; background: var(--line); }
+    .tl .lb { position: absolute; top: 7px; font-size: 10px; color: var(--muted); transform: translateX(-50%); }
+    .tl-note { font-size: 11px; color: var(--muted); margin-top: 14px; }
+
+    /* 能力档位四张卡（每张写清"她能做到什么"） */
+    .tier { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
+    @media (max-width: 620px) { .tier { grid-template-columns: repeat(2, 1fr); } }
+    .tier .t { padding: 10px 11px; border-radius: 10px; border: 1px solid var(--line); background: var(--card-solid);
+      cursor: pointer; transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease); }
+    .tier .t:hover { border-color: var(--pri-a40d); }
+    .tier .t.on { border-color: var(--accent); background: var(--accent-soft); }
+    .tier .tt { font-size: 13px; font-weight: 600; color: var(--ink); display: flex; align-items: center; gap: 6px; }
+    .tier .td { font-size: 11px; color: var(--ink2); margin-top: 4px; line-height: 1.6; }
+    .tier .now { font-size: 10px; padding: 1px 6px; border-radius: 999px; background: var(--accent); color: var(--white); font-weight: 500; }
+
+    /* 文件页**一行式** —— 类型块 +（文件名当主标题 + 一句话）+ 时间 + 动作。
+       文件名是不可牺牲的元素，该收缩的是次要动作（收进 ⋯）。 */
+    .fh-row { display: flex; align-items: center; gap: 11px; padding: 10px 2px; }
+    .fh-row + .fh-row { border-top: 1px solid var(--line); }
+    .fh-row .fh-kind { width: 34px; height: 34px; border-radius: 9px; flex: none; display: grid; place-items: center;
+      font-size: 9.5px; font-weight: 700; letter-spacing: .3px; color: var(--ink2); background: var(--row); border: 1px solid var(--line); }
+    .fh-row.k-doc .fh-kind { color: var(--doc-ink); background: var(--doc-a12); border-color: var(--doc-a25); }
+    .fh-row.k-sheet .fh-kind { color: var(--ok-ink); background: var(--ok-bg); border-color: var(--ok-a30); }
+    .fh-row.k-pdf .fh-kind { color: var(--rose-ink); background: var(--pri-high-bg); border-color: var(--rose-a30); }
+    .fh-row.k-img .fh-kind { color: var(--img-ink); background: var(--img-a14); border-color: var(--img-a30); }
+    .fh-row .fh-main { flex: 1; min-width: 0; }
+    .fh-row .fh-nm { font-size: 13.5px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .fh-row .fh-ds { font-size: 11.5px; color: var(--ink2); margin-top: 2px; }
+    .fh-row .fh-rt { display: flex; align-items: center; gap: 8px; flex: none; }
+    .fh-row .fh-at { font-size: 11.5px; color: var(--muted); }
+    .fh-row.gone .fh-nm { color: var(--muted); }
+    .fh-more { display: flex; gap: 6px; }
+    .fh-more button { font-size: 11px; color: var(--ink2); padding: 3px 8px; border-radius: 7px; }
+    .fh-more button:hover { background: var(--accent-soft); color: var(--ink); }
+    /* 常用能力卡（3 列；窄窗自动降两列） */
+    .cap-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 4px 0; }
+    @media (max-width: 520px) { .cap-grid { grid-template-columns: repeat(2, 1fr); } }
+    .cap-tile { display: flex; align-items: flex-start; gap: 9px; padding: 10px 11px; border-radius: 10px;
+      background: var(--row); border: 1px solid var(--line); cursor: pointer; text-align: left;
+      transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease); }
+    .cap-tile:hover { background: var(--accent-soft); border-color: var(--pri-a28b); }
+    .cap-tile .ci { font-size: 15px; line-height: 1.2; flex: none; }
+    .cap-tile .ct { display: block; font-size: 12.5px; font-weight: 600; color: var(--ink); }
+    .cap-tile .cd { display: block; font-size: 11px; color: var(--ink2); margin-top: 2px; line-height: 1.5; }
+    /* 技能行的状态胶囊（禁用了要看得出来，还要能恢复） */
+    .sk-chip { flex: none; font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line);
+      background: var(--bg); color: var(--ink2); white-space: nowrap; }
+    .sk-chip.on { background: var(--ok-bg); border-color: var(--ok-a35); color: var(--ok-ink); }
+    .sk-row { display: flex; align-items: center; gap: 11px; padding: 11px 2px; }
+    .sk-row + .sk-row { border-top: 1px solid var(--line); }
+    .sk-row .sk-main { flex: 1; min-width: 0; }
+    .sk-row .sk-nm { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+    .sk-row .sk-ds { font-size: 12px; color: var(--ink2); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sk-row .sk-rt { display: flex; align-items: center; gap: 8px; flex: none; }
+    .provider { display: flex; align-items: center; gap: 11px; padding: 11px 2px; }
+    .provider + .provider { border-top: 1px solid var(--line); }
+    .provider .name { font-size: 13.5px; font-weight: 600; flex: none; }
+    .provider .model { font-size: 12px; color: var(--ink2); min-width: 0; flex: 1;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .provider .ghost { flex: none; }
+    .mg-portrait { width: 44px; height: 44px; border-radius: 50%; overflow: hidden; background: var(--accent-soft);
+      color: var(--accent); display: grid; place-items: center; font-size: 18px; }
+    .mg-portrait img { width: 100%; height: 100%; object-fit: cover; }
+    /* 花销占比 */
+    .mg-spend { height: 8px; border-radius: 999px; overflow: hidden; background: var(--row); display: flex; margin-top: 4px; }
+    .mg-spend i { height: 100%; }
+    .mg-legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 7px; font-size: 12px; color: var(--ink2); }
+    .mg-legend .sq { display: inline-block; width: 8px; height: 8px; border-radius: 3px; margin-right: 5px; }
+    .mg-big { font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    /* 原有的动态列表/下拉（保持旧样式语义，只是换成行内观感） */
+    /* KPI 五张卡（窄到放不下就换行；数字最大、说明最小） */
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)); gap: 8px; }
+    .kpi-card { background: var(--row); border-radius: var(--radius-card); padding: 10px 12px; }
+    .kpi-card .kpi-t { font-size: 11.5px; color: var(--ink2); }
+    .kpi-card .kpi-v { font-size: 20px; font-weight: 700; margin: 3px 0 2px; }
+    .kpi-card .kpi-s { font-size: 11px; color: var(--ink3); line-height: 1.6; }
+    .switch-card { display: flex; align-items: center; gap: 11px; width: 100%; }
+    .switch-card .ico { width: 26px; height: 26px; border-radius: 8px; flex: none; display: grid; place-items: center;
+      background: var(--row); font-size: 13px; }
+    .switch-card .desc { min-width: 0; flex: 1; }
+    .switch-card .desc b { display: block; font-size: 13.5px; font-weight: 600; }
+    .switch-card .desc span { display: block; margin-top: 3px; font-size: 12px; color: var(--ink2); line-height: 1.6; }
+    .pill { font: inherit; font-size: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--ink2);
+      border-radius: 999px; padding: 4px 12px; cursor: pointer; flex: none; }
+    .pill.on { background: var(--grad); color: var(--white); border-color: transparent; }
+    /* 这段解释本来就是**多段**的，需要 pre-line，否则全被压成一行 */
+    .result { font-size: 12px; color: var(--ink2); margin-top: 6px; white-space: pre-line; line-height: 1.75; }
+    .result:empty { display: none; }
+    .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 12.5px; padding: 4px 0; }
+    .row .k { color: var(--ink2); flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .row .v { text-align: right; word-break: break-all; min-width: 0; }
+    .row .v.num, .num { font-variant-numeric: tabular-nums; }
+    #birth-card { padding: 26px 20px; text-align: center; }
+
+    /* ---------- 大脑 · 模型 ----------
+       卡片：有边框与留白、标题行有状态胶囊、配置项一行一项、按钮统一尺寸。 */
+    .brain-card { margin-top: 10px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px;
+      background: var(--card-solid); transition: border-color .15s, box-shadow .15s; }
+    .brain-card.active { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+    .brain-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; row-gap: 6px; }
+    .brain-head .radio { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--line);
+      flex: none; cursor: pointer; box-sizing: border-box; }
+    .brain-card.active .brain-head .radio { border: 5px solid var(--accent); }
+    .brain-title { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; min-width: 0; }
+    /* 状态胶囊**第二行**：这里有密钥/连通/延迟三个，
+       硬挤一行会折得很难看 —— 与其被动折行，不如主动分层 */
+    .brain-sub { flex-basis: 100%; order: 9; display: flex; align-items: center; gap: 8px;
+      margin-top: 2px; padding-left: 40px; }
+    .brain-title b { font-size: 14px; font-weight: 700; }
+    .brain-model { margin-left: auto; font-size: 12px; color: var(--ink2); font-variant-numeric: tabular-nums;
+      white-space: nowrap; }           /* 模型名别折成两行（deepseek-v4- / flash） */
+    .tag { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink2);
+      white-space: nowrap; }           /* 胶囊不许折行（"使用中"竖成两行太丑） */
+    .tag.amber { color: var(--warn-ink); border-color: var(--warn-line); background: var(--warn-bg); }
+    .tag.on { color: var(--accent); border-color: transparent; background: var(--accent-soft); font-weight: 600; }
+    /* 厂商方块：一个圆角方块把"这是谁"立住——用名字首字母，不引外部图标 */
+    .mg-logo { width: 30px; height: 30px; border-radius: 9px; flex: none; display: grid; place-items: center;
+      background: var(--accent-soft); color: var(--accent); font-size: 14px; font-weight: 700; text-transform: uppercase; }
+    .brain-toggle { width: 28px; height: 28px; flex: none; display: grid; place-items: center; cursor: pointer;
+      color: var(--ink2); background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+      transition: transform .15s, color .15s, background .15s; }
+    .brain-toggle:hover { background: var(--row); color: var(--ink); }
+    .brain-card.open .brain-toggle { transform: rotate(180deg); }
+    /* 密钥来源胶囊：跟状态胶囊同一套观感 */
+    .key-pill { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink2);
+      white-space: nowrap; }
+    .key-pill.ok { color: var(--key-ok-ink); border-color: var(--key-ok-line); background: var(--key-ok-bg); }
+    .key-pill.bad { color: var(--warn-ink); border-color: var(--warn-line); background: var(--warn-bg); }
+    .brain-ops { margin-top: 12px; display: none; flex-direction: column; gap: 9px; }
+    .brain-card.open .brain-ops { display: flex; }
+    .op-row { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--ink2); }
+    .op-row > span:first-child { flex: none; width: 30px; }
+    .op-row select, .op-row input[type="password"], .op-row input[type="text"] {
+      font: inherit; font-size: 12.5px; color: var(--ink); background: var(--bg);
+      border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; flex: 1; min-width: 0; }
+    .op-row select:focus, .op-row input:focus { outline: none; border-color: var(--accent); }
+    .brain-ops .ghost, .brain-head .ghost { font: inherit; font-size: 12px; color: var(--ink); background: var(--bg);
+      border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; cursor: pointer; flex: none; }
+    .brain-ops .ghost:hover, .brain-head .ghost:hover { background: var(--row); }
+    .hint { font-size: 11.5px; color: var(--ink2); line-height: 1.7; overflow-wrap: anywhere; }
+    .brain-link { font: inherit; font-size: 12px; color: var(--accent); background: none; border: none;
+      cursor: pointer; padding: 0 2px; flex: none; }
+    .brain-link:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+<div class="mg-app">
+  <nav class="mg-nav">
+    <div class="mg-back" id="mg-back" data-i18n="manage.mg-back.1"><span>←</span>返回应用</div>
+    <div class="mg-search"><span>🔍</span><input id="mg-q" placeholder="搜索设置…" / data-i18n-placeholder="manage.mg-q.1"></div>
+    <div id="mg-nav"></div>
+  </nav>
+  <main class="mg-body">
+
+    <!-- ============ 常规 ============ -->
+    <div class="mg-page" data-page="general">
+      <div class="mg-h1" data-i18n="manage.mg-h1.1">常规</div>
+      <div class="mg-sub" data-i18n="manage.mg-sub.1">她是谁、从哪来 —— 名字、性格、样子都装在那个出生包里。</div>
+      <div class="mg-status" id="save-status"></div>
+
+      <div class="mg-sec" id="birth-card" hidden>
+        <div class="mg-note" data-i18n="manage.mg-note.1">她还没有出生。导入一个出生包，或用出生向导让她出现。</div>
+        <div class="mg-list" id="pkg-summary"></div>
+        <div class="mg-list" id="pkg-meta"></div>
+        <div class="mg-field" style="margin-top:10px;justify-content:center">
+          <button class="mg-btn" id="import-btn" data-i18n="manage.import-btn.1">导入出生包</button>
+          <button class="mg-btn pri" id="birth-btn" hidden data-i18n="manage.birth-btn.1">重新生成出生包</button>
+        </div>
+        <span class="mg-val" id="pkg-id"></span>
+        <div class="result" id="birth-result"></div>
+      </div>
+
+      <div id="hero" hidden>
+        <div class="mg-sec"><div class="h" data-i18n="manage.h.1">她</div>
+          <div class="mg-box">
+            <div class="mg-row">
+              <div class="mg-portrait" id="portrait"></div>
+              <div class="tx"><div class="t" data-i18n="manage.t.1">她此刻的样子</div><div class="d" id="quote"></div></div>
+            </div>
+            <div class="mg-row"><div class="tx"><div class="t" data-i18n="manage.t.2">名字</div><div class="d" data-i18n="manage.d.1">你一喊，她就应</div></div>
+              <div class="ctl"><span class="mg-val strong" id="tb-name">TA</span></div></div>
+            <div class="mg-row"><div class="tx"><div class="t" data-i18n="manage.t.3">出生</div><div class="d" data-i18n="manage.d.2">出生那天定下了年龄与成长阶段</div></div>
+              <div class="ctl"><span class="mg-val" id="tb-days"></span></div></div>
+            <div class="mg-row"><div class="tx"><div class="t" data-i18n="manage.t.4">走到今天</div><div class="d" data-i18n="manage.d.3">记忆、日志与亲密度</div></div>
+              <div class="ctl mg-stats" id="hero-stats"></div></div>
+          </div>
+        </div>
+      </div>
+      <!-- 语言（三处入口之一；另两处在 我的 TA 与 出生向导） -->
+      <div class="mg-sec" id="lang-card"><div class="h" data-i18n="manage.lang.title">说什么语言</div>
+        <div class="mg-box">
+          <div class="mg-row" style="display:block">
+            <div class="t" data-i18n="manage.lang.t">界面语言</div>
+            <div class="d" data-i18n="manage.lang.d">默认跟随你的系统语言。选好之后重启生效——界面里到处是打开时就算好的字，热切换会把一半留在旧语言里。</div>
+            <div id="lang-pick" style="margin-top:8px"></div>
+          </div>
+        </div>
+        <div class="result" id="lang-result"></div>
+      </div>
+
+      <!-- 等待语随人格走（三套：温柔/干脆/俏皮）。预览要能**先看再选**。 -->
+      <div class="mg-sec" id="wait-tone-card"><div class="h" data-i18n="manage.tone.title">她等你的时候说什么</div>
+        <div class="mg-box">
+          <div class="mg-row" style="display:block">
+            <div class="tone-grid" id="tone-grid"></div>
+            <div class="d" id="tone-preview" style="margin-top:8px"></div>
+          </div>
+        </div>
+        <div class="mg-note" data-i18n="manage.tone.note">等待语只从固定词表里取，绝不带上她在做什么的细节（路径、命令、参数一个字都不会出现）。</div>
+      </div>
+    </div>
+
+    <!-- ============ 外观 ============ -->
+    <div class="mg-page" data-page="look">
+      <div class="mg-h1" data-i18n="manage.mg-h1.2">外观</div>
+      <div class="mg-sub" data-i18n="manage.mg-sub.2">她长什么样 —— 换一个形象，桌面上的她马上跟着变。</div>
+      <div class="mg-sec"><div class="h" data-i18n="manage.h.2">形象</div>
+        <div class="mg-box"><div class="mg-row" style="display:block"><div id="look-body" data-i18n="manage.look-body.1">加载中…</div></div></div>
+        <div class="mg-note" data-i18n="manage.mg-note.3">想看她的样子、把 TA 带走，在「个性化」里；<b data-i18n="manage.mg-note.2">换装面板这版先不动</b>（它一直没入口，账记在 19 号）。</div>
+      </div>
+    </div>
+
+    <!-- ============ 声音 ============ -->
+    <div class="mg-page" data-page="voice">
+      <div class="mg-h1" data-i18n="manage.mg-h1.3">声音</div>
+      <div class="mg-sub" data-i18n="manage.mg-sub.3">她说话用什么嗓子。</div>
+      <div class="mg-sec"><div class="h" data-i18n="manage.h.3">TA 的声音</div>
+        <div class="mg-box">
+          <div class="mg-row"><div class="tx"><div class="t" data-i18n="manage.t.5">音色</div><div class="d" data-i18n="manage.d.4">随人物设定；想换就换</div></div>
+            <div class="ctl"><select class="mg-sel" id="voice-select"></select></div></div>
+          <div class="mg-row"><div class="tx"><div class="t" data-i18n="manage.t.6">试听</div><div class="d" data-i18n="manage.d.5">让她说一句你听听</div></div>
+            <div class="ctl"><button class="mg-btn" id="voice-preview" data-i18n="manage.t.6">试听</button></div></div>
+        </div>
+        <div class="mg-note" id="voice-truth"></div>
+        <div class="result" id="voice-result"></div>
+      </div>
+    </div>
+
+    <!-- ============ 关系 ============ -->
+    <div class="mg-page" data-page="relation">
+      <div class="mg-h1" data-i18n="manage.mg-h1.4">关系</div>
+      <div class="mg-sub" data-i18n="manage.mg-sub.4">你和她处到哪一步 —— 关系只升不降，冲突不惩罚。</div>
+      <div class="mg-sec"><div class="h" data-i18n="manage.h.4">社交</div>
+        <div class="mg-box"><div class="mg-row" style="display:block"><div id="social-body" data-i18n="manage.look-body.1">加载中…</div></div></div>
+      </div>
+    </div>
+
+    <!-- ============ 能力 ============ -->
+    <div class="mg-page" data-page="ability">
+      <div class="mg-h1" data-i18n="manage.mg-h1.5">能力</div>
+      <div class="mg-sub" data-i18n="manage.mg-sub.5">她能不能出声、能不能看你的屏幕、在不在所有桌面空间出现。</div>
+      <div class="mg-sec"><div class="h" data-i18n="manage.h.5">开关</div>
+        <div class="mg-box">
+          <div class="mg-row" id="speech-card">
+            <div class="switch-card"><span class="ico">🔊</span>
+              <div class="desc"><b data-i18n="manage.desc.1">语音播报</b><span data-i18n="manage.desc.2">回答会说出来；关掉只显示气泡</span></div></div>
+            <div class="ctl"><button class="sw" id="speech-toggle" role="switch" aria-checked="true" aria-label="语音播报" data-i18n-aria-label="manage.desc.1"></button></div>
+          </div>
+          <div class="result" id="speech-result" style="padding:0 16px"></div>
+          <div class="mg-row" id="screen-card">
+            <div class="switch-card"><span class="ico">👀</span>
+              <div class="desc"><b data-i18n="manage.desc.3">屏幕观察</b><span data-i18n="manage.desc.4">定期看一眼屏幕，你在提问她会主动答</span></div></div>
+            <div class="ctl"><button class="sw" id="screen-toggle" role="switch" aria-checked="true" aria-label="屏幕观察" data-i18n-aria-label="manage.desc.3"></button></div>
+          </div>
+          <div class="result" id="screen-result" style="padding:0 16px"></div>
+          <div class="mg-row" id="global-card">
+            <div class="switch-card"><span class="ico">🖥</span>
+              <div class="desc"><b data-i18n="manage.desc.5">全局显示</b><span data-i18n="manage.desc.6">任何应用、任何桌面空间都能看到她</span></div></div>
+            <div class="ctl"><button class="sw" id="global-toggle" role="switch" aria-checked="true" aria-label="全局显示" data-i18n-aria-label="manage.desc.5"></button></div>
+          </div>
+          <div class="result" id="global-result" style="padding:0 16px 12px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 技能与工具 ============ -->
+    <div class="mg-page" data-page="skills">
+      <div class="mg-h1" data-i18n="manage.mg-h1.6">工具</div>
+      <div class="mg-sub" data-i18n="manage.mg-sub.6">她自己会的本领，和接进来的外部工具——都在这一页管。</div>
+      <!-- 常用能力卡（每张都真的按下去有事发生，不摆死瓦片） -->
+      <div class="mg-sec"><div class="h" data-i18n="manage.h.6">常用</div>
+        <div class="mg-box"><div class="cap-grid" id="cap-grid"></div></div>
+        <!-- 市场：这一页管"装了什么、用不用"；从哪儿装、有什么可装 → 市场页 -->
+        <div class="mg-box" style="margin-top:10px">
+          <div class="mg-row"><div class="tx">
+            <div class="t" data-i18n="manage.t.7">去市场看看</div>
+            <div class="d">技能和外部服务，从 GitHub 仓库或你自己的清单里装——<b data-i18n="manage.d.6">第三方内容，装之前给你看来源</b></div>
+          </div><div class="ctl"><button class="mg-btn pri" id="go-market" data-i18n="manage.go-market.1">打开市场 ›</button></div></div>
+        </div>
+      </div>
+      <div class="mg-sec"><div class="h" data-i18n="manage.h.7">她的本领（技能）</div>
+        <div class="mg-box" id="st-card">
+          <div class="mg-row">
+            <div class="mg-field" style="flex:1">
+              <span class="st-tabs" id="st-tabs">
+                <button class="st-tb on" data-t="skill" data-i18n="manage.st-tb.1">技能</button>
+                <button class="st-tb" data-t="mcp" data-i18n="manage.st-tb.2">MCP 服务</button>
+              </span>
+              <input id="st-search" placeholder="搜名字…" style="flex:1;min-width:0" / data-i18n-placeholder="manage.st-search.1">
+            </div>
+          </div>
+          <div class="mg-row" style="display:block"><div id="st-body" data-i18n="manage.look-body.1">加载中…</div></div>
+          <div class="mg-row" id="st-add-skill" style="display:block">
+            <div class="mg-field">
+              <input id="skill-src" placeholder="GitHub 仓库 owner/repo 或 SKILL 名称" style="flex:1;min-width:180px" / data-i18n-placeholder="manage.skill-src.1">
+              <button class="mg-btn pri" id="skill-install-btn" data-i18n="manage.skill-install-btn.1">安装技能</button>
+            </div>
+          </div>
+          <div class="mg-row" id="st-add-mcp" style="display:block">
+            <div class="mg-field">
+              <input id="mcp-name" placeholder="名称" style="width:120px" / data-i18n-placeholder="manage.mcp-name.1">
+              <input id="mcp-url" placeholder="MCP 地址（https://…）" style="flex:1;min-width:180px" / data-i18n-placeholder="manage.mcp-url.1">
+              <button class="mg-btn pri" id="mcp-install-btn" data-i18n="manage.mcp-install-btn.1">接上</button>
+            </div>
+          </div>
+        </div>
+        <div class="result" id="st-result"></div>
+      </div>
+    </div>
+
+    <!-- ============ 陪伴与打扰 ============ -->
+    <!-- ============ 衣柜 ============ -->
+    <div class="mg-page" data-page="wardrobe">
+      <div class="mg-h1" data-i18n="manage.mg-h1.7">衣柜</div>
+      <div class="mg-sub" data-i18n="manage.mg-sub.7">她有哪些衣服、每件是怎么来的。挑一件就是让她换上。</div>
+      <div class="mg-sec">
+        <div class="h">她的衣服<span class="act" id="wd-count"></span></div>
+        <div class="mg-box"><div id="wardrobe-body" data-i18n="manage.look-body.1">加载中…</div></div>
+      </div>
+      <div class="mg-sec">
+        <div class="h" data-i18n="manage.h.8">在她身上换装</div>
+        <div class="mg-box">
+          <div class="mg-row"><div class="tx"><div class="t" data-i18n="manage.t.8">换装面板</div>
+            <div class="d">角色库 / 服装部件 / 穿搭档案——这个面板本来就在形象端活着，只是一直<b data-i18n="manage.d.7">没有入口</b></div></div>
+            <div class="ctl"><button class="mg-btn" id="wd-open-panel" data-i18n="manage.wd-open-panel.1">在形象端打开 ›</button></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 文件 ============ -->
+    <!-- 市场：**客户端市场**——源 + 目录 + 装之前说清 + 管。
+         纪律：第三方一律标来源与"未审核"；取不到的源**带着错因显示**（不显示空市场）；
+         装东西不进她的签名链（链上记的是"她做过的事"，这一页记的是你做的事）。 -->
+    <div class="mg-page" data-page="market">
+      <div class="mg-h1" data-i18n="manage.mg-h1.8">市场</div>
+      <div class="mg-sub" data-i18n="manage.mg-sub.9">技能和外部服务，从哪儿装、装了些什么。这里的清单是第三方内容，<b data-i18n="manage.mg-sub.8">都没审核过</b>——装之前请看一眼原文。</div>
+      <div class="mg-sec"><div class="h" data-i18n="manage.h.9">可以装的</div>
+        <div class="mg-box">
+          <div class="mg-row" style="gap:8px;flex-wrap:wrap">
+            <input class="input" id="mk-search" placeholder="搜名字或用途…" style="flex:1;min-width:180px" data-i18n-placeholder="manage.mk-search.1">
+            <span class="mg-val" id="mk-count"></span>
+            <button class="mg-btn" id="mk-src-toggle" data-i18n="manage.mk-src-toggle.1">管理源</button>
+            <button class="mg-btn" id="mk-refresh" data-i18n="manage.mk-refresh.1">刷新</button>
+          </div>
+          <div id="mk-sources" style="display:none"></div>
+          <div class="mg-row" style="display:block"><div id="mk-body" data-i18n="manage.mk-body.1">正在读清单…</div></div>
+        </div>
+        <div class="result" id="mk-result"></div>
+      </div>
+      <!-- 装过的东西（来源与版本 / 检查更新 / 卸掉）。装/卸**不进她的签名链**。 -->
+      <div class="mg-sec"><div class="h" data-i18n="manage.h.10">装过的东西</div>
+        <div class="mg-box"><div id="mk-installed" data-i18n="manage.mk-installed.1">正在读…</div></div>
+        <div class="result" id="mk-installed-result"></div>
+      </div>
+    </div>
+
+    <div class="mg-page" data-page="files">
+      <div class="mg-h1" data-i18n="manage.mg-h1.9">文件</div>
+      <div class="mg-sub" data-i18n="manage.mg-sub.10">她经手过的文件——只有真数据：文件名、什么时候、她做过什么。没经手过就是空的，不摆假行。</div>
+      <div class="mg-sec">
+        <div class="mg-box" id="fh-box"><div class="fh-row" id="fh-empty"><span class="fh-main" data-i18n="manage.fh-main.1">还没有经手过文件</span></div></div>
+      </div>
+    </div>
+
+    <div class="mg-page" data-page="company">
+      <div class="mg-h1" data-i18n="manage.mg-h1.10">陪伴与打扰</div>
+      <div class="mg-sub" data-i18n="manage.mg-sub.11">她多久找你一次、什么时段安静 —— 以及手上正做着的活。</div>
+      <div class="mg-sec"><div class="h" data-i18n="manage.h.11">什么时候可以找你</div>
+        <div class="mg-box">
+          <div class="mg-row" style="display:block"><div id="budget-body" data-i18n="manage.look-body.1">加载中…</div></div>
+          <div class="mg-row"><div class="tx"><div class="t" data-i18n="manage.t.9">改一改</div><div class="d" data-i18n="manage.d.8">安静时段不主动出声；每日上限管着她找你的次数</div></div>
+            <div class="ctl">
+              <span class="mg-field" data-i18n="manage.mg-field.1">安静时段 <input class="n" id="b-qs" value="23" /> – <input class="n" id="b-qe" value="8" /> 时</span>
+              <span class="mg-field" data-i18n="manage.mg-field.2">每日上限 <input class="n" id="b-cap" value="3" /> 次</span>
+              <button class="mg-btn pri" id="b-save" data-i18n="manage.b-save.1">保存</button>
+            </div>
+          </div>
+        </div>
+        <div class="result" id="b-result"></div>
+      </div>
+      <div class="mg-sec"><div class="h" data-i18n="manage.h.12">进行中的事</div>
+        <div class="mg-box" id="tasks-card">
+          <div class="mg-row" style="display:block"><div id="tasks-body" data-i18n="manage.look-body.1">加载中…</div></div>
+          <div class="mg-row" style="display:block"><div id="jobs-body"></div></div>
+        </div>
+        <div class="result" id="tasks-result"></div>
+      </div>
+    </div>
+
+    <!-- ============ 模型与花销 ============ -->
+    <div class="mg-page" data-page="model">
+      <div class="mg-h1" data-i18n="manage.mg-h1.11">模型与花销</div>
+      <div class="mg-sub" data-i18n="manage.mg-sub.12">她用什么脑子想事；花了多少 —— 账只在这台机器上算，一个字节都不往外发。</div>
+      <div class="mg-sec"><div class="h" data-i18n="manage.h.13">大脑</div>
+        <div class="mg-note" id="llm-stats" data-i18n="manage.look-body.1">加载中…</div>
+        <div class="mg-box" id="brain-card" style="margin-top:10px">
+          <div class="mg-row" style="display:block"><div id="llm-body" data-i18n="manage.look-body.1">加载中…</div></div>
+          <div class="mg-row" style="display:block">
+            <div class="tx"><div class="t" data-i18n="manage.t.10">能力档位</div>
+              <div class="d" id="tier-note" data-i18n="manage.tier-note.1">按设备能力自动挑一档</div></div>
+            <!-- 能力档位：`#llm-tier` 这个 select 全仓只有"定义/赋值/保存"三处引用，
+                 **从来没有任何一处生成过 <option>** → 下拉永远是空的，点保存必报错，
+                 报错还会把英文枚举（all-local / hybrid / cloud-only）端到用户脸上。
+                 所以改成四张卡：每一档都写清"**她能做到什么**"，点了即刻生效（不再要一次"保存"）。 -->
+            <div class="tier" id="tier-cards"></div>
+          </div>
+          <div class="mg-row" style="display:block"><div id="perm-body"></div></div>
+        </div>
+        <div class="result" id="llm-result"></div>
+        <!-- 自定义大脑：一行入口（图标 + 一句话 + 「高级」+ 展开箭头）→ 展开是**分组表单**
+             （接口 → 模型 → 三个动作），测试结果就显示在表单里，不用满页找。 -->
+        <div class="cx-card" id="cx-details">
+          <button class="cx-head" id="cx-toggle" aria-expanded="false">
+            <span class="cx-ic">🧠</span>
+            <span class="cx-tt">接一个自定义大脑<small data-i18n="manage.cx-tt.1">OpenAI 兼容的接口——接上就多一个"脑子"可选</small></span>
+            <span class="sk-chip" data-i18n="manage.sk-chip.1">高级</span>
+            <span class="cx-caret" data-i18n="manage.cx-caret.1">展开 ›</span>
+          </button>
+          <div class="cx-body" id="cx-body" hidden>
+            <div class="cx-grp" data-i18n="manage.cx-grp.1">接口</div>
+            <div class="cx-field"><label data-i18n="manage.t.2">名字</label><input class="mg-sel" id="cx-name" placeholder="给它起个名字" / data-i18n-placeholder="manage.cx-name.1"></div>
+            <div class="cx-field"><label data-i18n="manage.cx-field.1">地址</label><input class="mg-sel" id="cx-url" placeholder="https://…/v1" /></div>
+            <div class="cx-field"><label data-i18n="manage.cx-field.2">密钥</label><input class="mg-sel" id="cx-key" placeholder="sk-…" /></div>
+            <div class="cx-grp" data-i18n="manage.cx-grp.2">模型</div>
+            <div class="cx-field"><label data-i18n="manage.cx-field.3">模型名</label><input class="mg-sel" id="cx-model" placeholder="例如 gpt-4o-mini / qwen-plus" / data-i18n-placeholder="manage.cx-model.1"></div>
+            <div class="cx-acts">
+              <button class="mg-btn" id="cx-test" data-i18n="manage.cx-test.1">测试连通</button>
+              <button class="mg-btn" id="cx-save" data-i18n="manage.b-save.1">保存</button>
+              <button class="mg-btn pri" id="cx-use" data-i18n="manage.cx-use.1">用它</button>
+            </div>
+            <div class="result" id="cx-result"></div>
+          </div>
+        </div>
+      </div>
+      <div class="mg-sec"><div class="h" data-i18n="manage.h.14">花销</div>
+        <div class="mg-box" id="cost-card">
+          <div class="mg-row" style="display:block"><div id="cost-body" data-i18n="manage.look-body.1">加载中…</div></div>
+          <div class="mg-row"><div class="tx"><div class="t" data-i18n="manage.t.11">刚才那轮为什么贵？</div><div class="d" data-i18n="manage.d.9">拆开看 token 花在哪</div></div>
+            <div class="ctl"><button class="mg-btn" id="cost-explain" data-i18n="manage.cost-explain.1">看解释</button></div></div>
+        </div>
+        <div class="result" id="cost-result"></div>
+      </div>
+      <!-- 她干得怎么样（五项）——不新建面板，就挂在这页下面 -->
+      <div class="mg-sec"><div class="h" data-i18n="manage.kpi.title">她干得怎么样</div>
+        <div class="mg-box" id="kpi-card">
+          <div class="mg-row" style="display:block"><div id="kpi-body" data-i18n="manage.look-body.1">加载中…</div></div>
+          <div class="mg-row"><div class="tx"><div class="t" data-i18n="manage.kpi.how.t">这五个数是怎么来的</div>
+            <div class="d" id="kpi-src"></div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 数据与安全 ============ -->
+    <!-- 我的规矩：审批卡上点过「以后这类都行」记下的规矩都在这儿。
+         纪律：这一页**只动用户层** —— 内置底线与保留区删不掉（那正是"墙只许加高不许拆"）；
+         每条都要说清"覆盖什么"，因为点它的那一下是**盲签风险**最高的一步。 -->
+    <div class="mg-page" data-page="rules">
+      <div class="mg-h1" data-i18n="manage.mg-h1.12">我的规矩</div>
+      <div class="mg-sub" data-i18n="manage.mg-sub.13">你在审批卡上点过「以后这类都行」的，都记在这儿——她以后自己按这些办，随时能删。</div>
+      <div class="mg-sec"><div class="h" data-i18n="manage.h.15">她可以不用问就做的</div>
+        <div class="mg-box" id="rules-body"></div>
+        <div class="result" id="rules-result"></div>
+      </div>
+      <!-- 规则语言（参数级 / glob）。写法提示与诊断**来自宿主一处**
+           （`myRules().hint` + 每条自带的 issue），界面不自己造句、也不自己判对错。 -->
+      <div class="mg-sec"><div class="h" data-i18n="manage.h.16">自己写一条</div>
+        <div class="mg-box">
+          <div class="mg-row" style="align-items:flex-start"><div class="tx">
+            <div class="d" id="rules-hint" style="white-space:pre-line" data-i18n="manage.rules-hint.1">正在读取写法…</div>
+            <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+              <input class="input" id="rule-tool" placeholder="工具（如 write）" style="max-width:150px" data-i18n-placeholder="manage.rule-tool.1">
+              <input class="input" id="rule-match" placeholder="写法（如 write(path: ~/Documents/**)）" style="flex:1;min-width:260px" data-i18n-placeholder="manage.rule-match.1">
+              <button class="mg-btn pri" id="rule-add" data-i18n="manage.rule-add.1">加上</button>
+            </div>
+            <div class="d" id="rule-check" style="margin-top:8px"></div>
+          </div><div class="ctl"></div></div>
+        </div>
+      </div>
+      <div class="mg-sec"><div class="h" data-i18n="manage.h.17">三条不许破的</div>
+        <div class="mg-box">
+          <div class="mg-row"><div class="tx"><div class="t" data-i18n="manage.t.12">规矩只能加码，不能拆墙</div>
+            <div class="d" data-i18n="manage.d.10">你自己写的规矩压不过硬底线：禁区读不到、删除一律改道回收站、危险命令一律拒。</div></div>
+            <div class="ctl"><span class="mg-val" data-i18n="manage.mg-val.1">已生效</span></div></div>
+          <div class="mg-row"><div class="tx"><div class="t" data-i18n="manage.t.13">一次对话最多记一条</div>
+            <div class="d" data-i18n="manage.d.11">防止被打断的时候连点"都允许"把规矩表写满；想再记一条，等下一轮对话。</div></div>
+            <div class="ctl"><span class="mg-val" id="rules-quota">—</span></div></div>
+          <div class="mg-row"><div class="tx"><div class="t" data-i18n="manage.t.14">只记窄的，不记"什么都能干"</div>
+            <div class="d" data-i18n="manage.d.13">能给她的只有一条<b data-i18n="manage.d.12">说得出范围</b>的规矩（比如"git status 开头的命令"）；
+              <code>sudo</code>、<code>bash</code>、<code>npm test</code> 这类"自己就能跑任意命令"的，一律不给这颗按钮。</div></div>
+            <div class="ctl"><span class="mg-val" data-i18n="manage.mg-val.1">已生效</span></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mg-page" data-page="data">
+      <div class="mg-h1" data-i18n="manage.mg-h1.13">数据与安全</div>
+      <div class="mg-sub" data-i18n="manage.mg-sub.14">她的记忆与凭据都在这台机器上；导出、接回、清空都从这里走。</div>
+      <div class="mg-sec"><div class="h" data-i18n="manage.h.18">本机</div>
+        <div class="mg-box">
+          <div class="mg-row"><div class="tx"><div class="t" data-i18n="manage.t.15">记忆</div><div class="d" data-i18n="manage.d.14">可看、可改、可忘</div></div>
+            <div class="ctl"><span class="mg-val" id="mg-mem">—</span><button class="mg-btn" id="mg-open-mem" data-i18n="manage.mg-open-mem.1">打开记忆</button></div></div>
+          <div class="mg-row"><div class="tx"><div class="t" data-i18n="manage.t.16">日志</div><div class="d" data-i18n="manage.d.15">她做过的事的流水</div></div>
+            <div class="ctl"><span class="mg-val" id="mg-entries">—</span></div></div>
+          <!-- 衣柜迁到自己的页（左导航「衣柜」）；这里只留一句指路，别再嵌一份。 -->
+          <div class="mg-row"><div class="tx"><div class="t" data-i18n="manage.mg-h1.7">衣柜</div>
+            <div class="d" data-i18n="manage.d.16">已经搬到自己的页去了——衣服和换装本来就该在一起</div></div>
+            <div class="ctl"><button class="mg-btn" id="go-wardrobe" data-i18n="manage.go-wardrobe.1">去衣柜 ›</button></div></div>
+        </div>
+      </div>
+      <!-- 授权目录：默认**不设边界**（行为不变）；这里只负责"想收窄的时候有地方收窄"。
+           文案零技术字段：不出现路径变量、不出现内部码；说不清的（比如"删了之后已经写出去的不会回滚"）
+           一律如实说，不美化。 -->
+      <div class="mg-sec"><div class="h" data-i18n="manage.ws.title">她能在哪些文件夹里动文件</div>
+        <div class="mg-box" id="ws-body"></div>
+        <div class="result" id="ws-result"></div>
+      </div>
+      <!-- 她看过什么 —— 数字从**签名链**数出来，不另存一份计数。
+           为什么放在这一页：屏幕是她的眼睛，这件事要看得见才放心。 -->
+      <!-- **这一轮的内容是谁给的** —— 记录层早就分了（origin 进 payload、
+           来源不进记忆提炼），这一行把它翻成人话给用户看：不看见就没法验证那句承诺。 -->
+      <div class="mg-sec"><div class="h" data-i18n="manage.origins.title">这一轮是谁说的</div>
+        <div class="mg-box">
+          <div class="mg-row"><div class="tx">
+            <div class="t" id="og-t">—</div>
+            <div class="d" id="og-d" data-i18n="manage.origins.d">她自己触发的那几轮（定时、心跳、看一眼屏幕）不会被当成你说的话，也不会写进她关于你的记忆。</div>
+          </div><div class="ctl"><button class="mg-btn" id="og-recent" data-i18n="manage.og-recent.1">看最近几轮</button></div></div>
+          <div id="og-list" style="display:none"></div>
+        </div>
+      </div>
+
+      <div class="mg-sec"><div class="h" data-i18n="manage.screen.title">她看过什么</div>
+        <div class="mg-box">
+          <div class="mg-row"><div class="tx">
+            <div class="t" id="scr-t" data-i18n="manage.screen.count.t">还没看过屏幕</div>
+            <div class="d" id="scr-d" data-i18n="manage.screen.count.d">她要看屏幕时，每一次都会记进签名链——这里读的就是那些记录。</div>
+          </div><div class="ctl"><button class="mg-btn" id="scr-recent" data-i18n="manage.scr-recent.1">看记录</button></div></div>
+          <div id="scr-list" style="display:none"></div>
+          <div class="mg-row"><div class="tx">
+            <div class="t" data-i18n="manage.screen.watch.t">定时观察</div>
+            <div class="d" data-i18n="manage.screen.watch.d">打开后她每 45 秒看一眼屏幕（画面会送去识别，也就是说会离开这台机器）；每次都会记一笔，随时能关。</div>
+          </div><div class="ctl"><span class="mg-val" id="scr-watch">—</span>
+            <button class="mg-btn" id="scr-watch-btn" data-i18n="manage.scr-watch-btn.1">打开</button></div></div>
+        </div>
+        <div class="result" id="screen-result"></div>
+      </div>
+      <div class="mg-sec"><div class="h" data-i18n="manage.destroy.title">销毁</div>
+        <div class="mg-box">
+          <div class="mg-row"><div class="tx">
+            <div class="t" data-i18n="manage.destroy.t">销毁这台机器上的她</div>
+            <div class="d" id="destroy-desc" data-i18n="manage.destroy.d">导出记忆包之后，你可以把本机的她销毁——销毁完这台机器上就是一个全新的她，下次打开从头开始（重新选形象、声音、性格）。这一步不能撤销。</div>
+          </div><div class="ctl"><button class="mg-btn danger" id="destroy-btn" data-i18n="manage.destroy-btn.1">销毁…</button></div></div>
+        </div>
+        <div class="result" id="destroy-result"></div>
+      </div>
+      <div class="mg-sec"><div class="h" data-i18n="manage.h.19">换机与备份</div>
+        <div class="mg-box">
+          <div class="mg-row"><div class="tx"><div class="t" data-i18n="manage.t.17">记忆包</div><div class="d" data-i18n="manage.d.17">加密后导出，密码只有你知道；换台机器接回来还是她</div></div>
+            <div class="ctl"><button class="mg-btn pri" id="backup-btn" data-i18n="manage.backup-btn.1">导出记忆包</button>
+              <button class="mg-btn" id="restore-btn" data-i18n="manage.restore-btn.1">接回 TA</button></div></div>
+        </div>
+        <div class="result" id="backup-result"></div>
+        <div class="result" id="restore-result"></div>
+      </div>
+      <!-- 给人看的那一份——跟"给机器搬"的记忆包**分工不同**，所以并排放、各说各的 -->
+      <div class="mg-sec"><div class="h" data-i18n="manage.exportChat.title">把这一段对话存成一页</div>
+        <div class="mg-box">
+          <div class="mg-row"><div class="tx">
+            <div class="t" data-i18n="manage.exportChat.t">一页网页文件（双击就开）</div>
+            <div class="d" data-i18n="manage.exportChat.d">存成一页自带样式的文件，双击就能看、能打印、能发给人。样式都在这一个文件里，打开时不联网。要换台机器接着聊，请用上面的记忆包。</div></div>
+            <div class="ctl"><button class="mg-btn" id="chat-html-btn" data-i18n="manage.exportChat.go">存成一页</button></div></div>
+        </div>
+        <div class="result" id="chat-html-result"></div>
+      </div>
+      <!-- 后台复盘——她自己回头看这段对话，**只能提候选**，批不批在你 -->
+      <div class="mg-sec"><div class="h" data-i18n="manage.review.title">让她自己复盘</div>
+        <div class="mg-box">
+          <div class="mg-row" id="review-card">
+            <div class="switch-card"><span class="ico">🪞</span>
+              <div class="desc"><b data-i18n="manage.review.t">每 10 轮回头看一次</b><span data-i18n="manage.review.d">她自己把刚聊过的内容过一遍，值得长期记住的、或者以后还能照做的流程，提成候选等你点头——不点头就不生效。它另开一份上下文，只能看和提候选，碰不到你的文件；每 10 轮多花一次便宜档的钱，默认关。</span></div></div>
+            <div class="ctl"><button class="sw off" id="review-toggle" role="switch" aria-checked="false" aria-label="让她自己复盘" data-i18n-aria-label="manage.review-toggle.1"></button></div>
+          </div>
+          <div class="result" id="review-result" style="padding:0 16px 12px"></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+  <style>
+    /* 销毁按钮：这是全页唯一"点了就回不来"的动作，给它危险色（视觉层级不能骗人） */
+    .mg-btn.danger { background: var(--danger-soft); color: var(--danger); box-shadow: inset 0 0 0 1px var(--rose-a45); }
+    .mg-btn.danger:hover { background: var(--rose-a22); }
+
+    /* ---- 等待语三套 ---- */
+    .tone-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .tone-opt { text-align: left; padding: 9px 11px; border-radius: var(--radius-card); background: var(--row);
+      box-shadow: inset 0 0 0 1px var(--line); cursor: pointer; }
+    .tone-opt.on { box-shadow: inset 0 0 0 2px var(--accent); background: var(--accent-soft); }
+    .tone-opt .tt { display: block; font-size: 13px; font-weight: 600; }
+    .tone-opt .td { display: block; font-size: var(--fs-xs); color: var(--ink3); margin-top: 4px; line-height: 1.5; }
+
+    /* ---- 市场：卡片网格 + 源错误块 ---- */
+    .mk-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .mk-card { background: var(--row); border-radius: var(--radius-card); padding: 11px 12px; display: flex; flex-direction: column; gap: 6px; }
+    .mk-h { display: flex; align-items: center; gap: 7px; font-size: 13.5px; }
+    .mk-kind { width: 18px; height: 18px; border-radius: 5px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; flex: none; }
+    .mk-kind.k-skill { background: var(--accent-soft); color: var(--accent); }
+    .mk-kind.k-mcp { background: var(--ok-a16b); color: var(--ok); }
+    .mk-d { font-size: var(--fs-sm); color: var(--ink2); line-height: 1.6; }
+    .mk-s { font-size: var(--fs-xs); color: var(--ink3); line-height: 1.6; word-break: break-all; }
+    .mk-s b { color: var(--warn); }
+    .mk-ops { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+    .mk-grp { font-size: var(--fs-sm); color: var(--ink2); margin: 12px 0 8px; }
+    .mk-src-err { background: var(--danger-soft); border-radius: var(--radius-card); padding: 10px 12px; margin: 8px 0;
+      font-size: var(--fs-sm); line-height: 1.7; }
+    .mk-kv { display: flex; gap: 10px; font-size: var(--fs-sm); line-height: 1.7; padding: 4px 0; }
+    .mk-kv .k { color: var(--ink3); flex: none; width: 62px; }
+    .mk-kv .v { color: var(--ink); flex: 1; min-width: 0; }
+    .mg-page[data-page="market"] .mask .modal { width: min(560px, 86vw); }
+
+    /* ---- 销毁对话框 ----
+       排版纪律：默认全选 · 大类勾选框三态（勾上/半选/没勾）· 每个大类可展开、小项单独勾 ·
+       **只有列表滚动**（标题与按钮始终看得见）。 */
+    .dz { width: min(560px, 92vw); padding: 0; overflow: hidden;
+      display: flex; flex-direction: column; max-height: min(90vh, 760px); }
+    .dz-h { padding: 19px 22px 13px; border-bottom: 1px solid var(--line); }
+    .dz-h .dz-t { font-size: 16.5px; font-weight: 600; letter-spacing: .5px; }
+    .dz-h .dz-s { font-size: var(--fs-sm); color: var(--ink2); line-height: 1.75; margin-top: 7px; }
+    .dz-bar { display: flex; align-items: center; gap: 10px; padding: 11px 22px 3px; }
+    .dz-bar .dz-all { display: flex; align-items: center; gap: 7px; font-size: var(--fs-sm); color: var(--ink2); cursor: pointer; user-select: none; }
+    .dz-bar .dz-sp { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+    .dz-bar .dz-fold { font-size: var(--fs-xs); color: var(--ink3); cursor: pointer; }
+    .dz-bar .dz-fold:hover { color: var(--accent); }
+    .dz-bar .dz-n { font-size: var(--fs-xs); color: var(--ink3); }
+    .dz-list { padding: 6px 14px 10px; flex: 1; min-height: 0; overflow-y: auto; }
+
+    /* 一个大类 */
+    .dz-g { border-radius: var(--radius-card); }
+    .dz-g.on { background: var(--accent-soft); }
+    .dz-g-h { display: flex; align-items: flex-start; gap: 11px; padding: 9px 12px; border-radius: var(--radius-card); cursor: pointer; }
+    .dz-g-h:hover { background: var(--row); }
+    .dz-g.on .dz-g-h:hover { background: transparent; }
+    .dz-g-h .dz-caret { width: 14px; height: 18px; flex: none; display: flex; align-items: center; justify-content: center;
+      color: var(--ink3); transition: transform .16s; margin-top: 1px; }
+    .dz-g-h .dz-caret.open { transform: rotate(90deg); }
+    .dz-g-h .dz-caret.leaf { visibility: hidden; }   /* 没有小项的大类（花销）不留假的展开箭头 */
+    .dz-g-h .dz-tx { flex: 1; min-width: 0; }
+    /* ⚠ 标题与说明必须各自成行：漏了 display:block 会挤成一行 */
+    .dz-g-h .dz-t2 { display: block; font-size: 12.5px; font-weight: 500; }
+    .dz-g-h .dz-d { display: block; font-size: var(--fs-xs); color: var(--ink3); line-height: 1.6; margin-top: 3px; }
+    .dz-g-h .dz-sz { font-size: var(--fs-xs); color: var(--ink2); flex: none; margin-left: 8px; white-space: nowrap; }
+
+    /* 勾选框（勾上 / 半选 / 没勾）。⚠ 选择器必须写清层级：大类是 `.dz-g > .dz-g-h > .dz-cb`，小项是 `.dz-sub > .dz-cb`。
+       `.on > .cb`（子选择器）匹配不到大类的框，"半选"那道横线画不出来；
+       而 `.on .cb`（后代选择器）又会把展开后**没勾的小项**一起染紫。 */
+    .dz-cb { width: 18px; height: 18px; border-radius: 5px; flex: none; margin-top: 1px; background: var(--card);
+      box-shadow: inset 0 0 0 1.5px var(--line); position: relative; transition: all .12s; cursor: pointer; }
+    .dz-g.on > .dz-g-h > .dz-cb, .dz-g.half > .dz-g-h > .dz-cb,
+    .dz-sub.on > .dz-cb, .dz-all.on > .dz-cb, .dz-all.half > .dz-cb { background: var(--accent); box-shadow: none; }
+    .dz-g.on > .dz-g-h > .dz-cb::after, .dz-sub.on > .dz-cb::after, .dz-all.on > .dz-cb::after {
+      content: ''; position: absolute; left: 6px; top: 2.5px; width: 4px; height: 9px;
+      border: solid var(--white); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+    /* 半选：一道横杠（这一组里只勾了一部分） */
+    .dz-g.half > .dz-g-h > .dz-cb::after, .dz-all.half > .dz-cb::after {
+      content: ''; position: absolute; left: 4.5px; top: 8px; width: 9px; height: 2px; border-radius: 1px; background: var(--white); }
+
+    /* 展开后的小项（树形缩进 + 一条细导线） */
+    .dz-subs { display: none; padding: 2px 12px 8px 46px; position: relative; }
+    .dz-subs.open { display: block; animation: dz-drop .16s ease; }
+    @keyframes dz-drop { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+    .dz-subs::before { content: ''; position: absolute; left: 34px; top: 2px; bottom: 12px; width: 1px; background: var(--line); }
+    .dz-sub { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 8px; cursor: pointer; }
+    .dz-sub:hover { background: var(--row); }
+    .dz-g.on .dz-sub:hover { background: var(--pri-a10); }
+    .dz-sub .dz-cb { width: 16px; height: 16px; margin-top: 0; }
+    .dz-sub .dz-cb::after { left: 5px; top: 2px; width: 3.5px; height: 8px; }
+    .dz-sub .dz-st { font-size: 12px; }
+    .dz-sub .dz-sd { font-size: var(--fs-xs); color: var(--ink3); margin-left: 6px; }
+    .dz-sub .dz-ss { margin-left: auto; font-size: var(--fs-xs); color: var(--ink3); }
+
+    .dz-f { display: flex; align-items: center; gap: 10px; padding: 13px 22px 17px; border-top: 1px solid var(--line); }
+    .dz-f .dz-sp { margin-left: auto; display: flex; gap: 10px; }
+    /* 销毁回执（删了什么/留了什么）也用同一套行样式，但不给鼠标手势 */
+    .dz-receipt { cursor: default; }
+  </style>
+  <script src="./i18n.js"></script>
+  <!-- 这页有 UI2.Toast / UI2.Modal / UI2.LocalePicker 的调用点，必须引 components.js——
+       否则 `UI2 is not defined`（异步里抛，界面看不出异常，只是那几处**什么都不发生**）。 -->
+  <script src="./components.js"></script>
+  <!-- 等待语三套在 state-words.js（唯一真源）——设置页的示范句直接从它取，
+       不在界面里另抄一份（抄一份就是"第二张表"的开始） -->
+  <script src="./state-words.js"></script>
+  <script>
+    const LEVELS = { friend: '朋友', close: '亲密好友', partner: '伴侣', stranger: '陌生' };
+    // 引号转义：esc 同时用于文本与**属性**上下文
+    // （data-*/value= 里出现引号即可越出属性注入新属性）；模型名/技能名等取值来自用户或第三方技能文件。
+    const esc = (s) => String(s ?? '').replace(/[<>&"']/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' }[c]));
+    const $ = (id) => document.getElementById(id);
+    const setResult = (id, text, ok) => {
+      const el = $(id);
+      el.textContent = text;
+      el.className = 'result ' + (ok === true ? 'ok' : ok === false ? 'bad' : '');
+    };
+
+    // ---- 状态变量 ----
+    let prefs = { speechEnabled: true, voiceEngine: 'cloud', voiceName: '', globalVisible: true };
+    let voiceInfo = { gender: 'female', recommended: 'Cherry', cloudVoices: { female: ['Cherry'], male: ['Ethan'] } };
+    let screenActive = false;
+    let birthPkg = null;
+
+    // ---- 生命一句话（Signature：由状态派生，TA 的自我介绍） ----
+    function renderHero(s) {
+      const bound = s.bound !== false;
+      $('birth-card').hidden = bound;
+      $('hero').hidden = !bound;
+      if (!bound) return;
+      // 肖像经 DOM API 构建 + URL 白名单校验（仅 data:image 或 https），不进 innerHTML 属性上下文
+      const portraitEl = document.createElement(s.portrait && /^data:image\/|^https:\/\//.test(s.portrait) ? 'img' : 'span');
+      if (portraitEl.tagName === 'IMG') {
+        portraitEl.src = s.portrait;
+        portraitEl.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%';
+      } else {
+        portraitEl.textContent = '✦';
+      }
+      $('portrait').replaceChildren(portraitEl);
+      const age = s.age ? `今天是我出生的第 <b>${s.age.days}</b> 天（${s.age.narrative}）` : '我刚出生';
+      const facetLabel = s.facets?.find((f) => f.key === s.facet)?.label ?? '默认';
+      const cloud = s.degraded ? '云端暂时联系不上（本机存续态）' : '一切正常';
+      $('quote').innerHTML = `${age}，现在是<b>${esc(facetLabel)}</b>，${cloud}。`;
+      // 标题里的天数：不满一岁按天说。与 me.html 的 me-days 同一规则；
+      // ⚠ 「1 岁后按月 / 满岁按年」两个分支**两页都还没实现**（status().age 只给 days/years，
+      //   没有月份字段）——不自己发明公式。
+      $('tb-days').textContent = s.age?.days != null ? `第 ${s.age.days} 天${s.age.narrative ? ` · ${s.age.narrative}` : ''}` : '';
+      const stageLabel = LEVELS[s.stage] ?? s.stage ?? '—';
+      const pct = Math.max(0, Math.min(1, (s.intimacy ?? 0)));
+      $('hero-stats').innerHTML = `
+        <span class="stat">关系 <b>${esc(stageLabel)}</b></span>
+        <span class="intimacy-bar" title="亲密度 ${(s.intimacy ?? 0).toFixed(2)}"><i style="width:${(pct * 100).toFixed(0)}%"></i></span>
+        <span class="stat">记忆 <b class="num">${s.memories ?? 0}</b> 条</span>
+        <span class="stat">日志 <b class="num ${s.integrity?.ok ? 'ok' : 'bad'}">${s.integrity?.ok ? s.entries + ' 条 ✓' : '⚠'}</b></span>`;
+    }
+
+    // ---- 刷新 ----
+    // ---- 花销 ----
+    async function renderCost() {
+      const c = await window.api.costSummary?.().catch(() => null);
+      if (!c || c.ok === false) { $('cost-body').innerHTML = '<span style="color:var(--ink-faint)">还没开始记账</span>'; return; }
+      const rows = [
+        `<div class="row"><span class="k">今天</span><span class="v"><b class="num">${esc(c.today.costText)}</b>（${c.today.calls} 次）</span></div>`,
+        `<div class="row"><span class="k">${esc(c.monthLabel)}</span><span class="v"><b class="num">${esc(c.month.costText)}</b>（${c.month.calls} 次调用）</span></div>`,
+      ];
+      if (c.cacheSaved?.cost > 0) rows.push(`<div class="row"><span class="k">缓存帮我省了</span><span class="v">约 ${esc(c.cacheSaved.costText)}</span></div>`);
+      /* 花销用**占比条** —— 每一桶的钱 ÷ 这个月总额，数据现成。
+         **消费上限字段不存在**（`budget*` 管的是主动打扰），所以"配额进度条"做不出来。 */
+      const BAR_COLORS = ['var(--accent)', 'var(--pri-lite)', 'var(--pri-low)', 'var(--ok-soft)', 'var(--pri-mid)'];
+      const barBlock = (title, list) => {
+        const total = list.reduce((a, x) => a + (x.cost ?? 0), 0) || 1;
+        const bars = list.map((x, i) => `<i style="width:${Math.max(1, Math.round((x.cost ?? 0) / total * 100))}%;background:${BAR_COLORS[i % BAR_COLORS.length]}"></i>`).join('');
+        const legend = list.map((x, i) => `<span><i class="sq" style="background:${BAR_COLORS[i % BAR_COLORS.length]}"></i>${esc(x.label)} ${esc(x.costText)}${x.calls ? ` · ${Math.round((x.cost ?? 0) / total * 100)}%` : ''}</span>`).join('');
+        return `<div class="row" style="display:block"><span class="k">${esc(title)}</span>`
+          + `<div class="mg-spend">${bars}</div><div class="mg-legend">${legend}</div></div>`;
+      };
+      if (c.byRole?.length) rows.push(barBlock('都花在哪', c.byRole));
+      if (c.byModel?.length > 1) rows.push(barBlock('按她用的脑子', c.byModel));
+      $('cost-body').innerHTML = rows.join('');
+    }
+    /* ---- KPI 五项（挂在这一页，不新建面板）----
+       纪律：分母为 0 的项显示「—」而不是 0%（"没验过" != "验了没过"）；每个数下面写清出处。 */
+    async function renderKpi() {
+      const k = await window.api.kpiSummary?.(7).catch(() => null);
+      const box = $('kpi-body');
+      if (!box) return;
+      if (!k || k.ok === false) { box.innerHTML = '<span style="color:var(--ink-faint)">还没有可算的记录</span>'; return; }
+      const t = k.today;
+      const pct = (v) => (v === null || v === undefined ? '—' : `${Math.round(v * 100)}%`);
+      const usd = (v) => (v === null || v === undefined ? '—' : `$${Number(v).toFixed(4)}`);
+      const card = (label, value, sub) => `<div class="kpi-card"><div class="kpi-t">${esc(label)}</div>`
+        + `<div class="kpi-v">${esc(value)}</div><div class="kpi-s">${esc(sub)}</div></div>`;
+      const cards = [
+        card('任务成功率', pct(t.tasks.rate), `${t.tasks.completed} 成 / ${t.tasks.failed} 败${t.tasks.cancelled ? ` / ${t.tasks.cancelled} 你自己叫停` : ''}`),
+        card('验证成功率', pct(t.verify.rate), t.verify.total ? `${t.verify.hit} / ${t.verify.total} 份验证报告过了` : '今天没验过'),
+        card('恢复成功率', pct(t.recovery.rate), t.recovery.total ? `${t.recovery.hit} / ${t.recovery.total} 次重来成了` : '今天没重来过'),
+        card('工具效率', pct(t.tools.efficiency), t.tools.calls ? `${t.tools.calls} 次调用，失败 ${t.tools.failed} 次` : '今天没调工具'),
+        card('每次成功成本', usd(t.cost.perSuccessUsd), t.tasks.completed ? `今天花了 ${usd(t.cost.spentUsd)}，成了 ${t.tasks.completed} 件` : '今天还没干成一件活'),
+      ];
+      const hist = (k.rows ?? []).slice(-7).map((r) => `<div class="row"><span class="k">${esc(r.day)}</span>`
+        + `<span class="v">任务 ${esc(pct(r.tasks?.rate))} · 验证 ${esc(pct(r.verify?.rate))} · 恢复 ${esc(pct(r.recovery?.rate))}`
+        + ` · 工具 ${esc(pct(r.tools?.efficiency))} · 每件 ${esc(usd(r.cost?.perSuccessUsd))}</span></div>`).join('');
+      box.innerHTML = `<div class="row" style="display:block"><div class="kpi-grid">${cards.join('')}</div></div>`
+        + (hist ? `<div class="row" style="display:block"><span class="k">最近几天</span>${hist}</div>` : '');
+      const src = $('kpi-src');
+      if (src) src.textContent = k.sources ?? '';
+    }
+    $('cost-explain')?.addEventListener('click', async () => {
+      const r = await window.api.costExplainLast?.().catch(() => null);
+      setResult('cost-result', r?.ok ? r.text : (r?.error ?? '还查不了'), !!r?.ok);
+    });
+
+    // ---- 进行中的事（任务账本 + 定时任务）----
+    // 状态词直接来自账本（卡住/限流/额度用完分开说），这里只负责画出来。
+    const TASK_ICON = { active: '●', paused: '⏸', needs_input: '🙋', blocked: '⛔', usage_limited: '⏳', budget_limited: '💳', completed: '✅', failed: '❌', cancelled: '✖' };
+    /* 日期时间按**当前语言**排：英文 `M/D, HH:mm`、日文 `M/D HH:mm`——交给 Intl 定，别自己拼 */
+    function fmtTime(ts) {
+      if (!ts) return '';
+      const loc = (() => { try { return window.I18N?.locale || 'zh-CN'; } catch { return 'zh-CN'; } })();
+      try {
+        return new Intl.DateTimeFormat(loc, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(ts));
+      } catch {
+        const d = new Date(ts);
+        const p = (n) => String(n).padStart(2, '0');
+        return `${d.getMonth() + 1}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+      }
+    }
+    function renderTasks(tasks, jobs) {
+      $('tasks-body').innerHTML = tasks.length
+        ? tasks.map((t) => `<div class="provider">
+            <span class="name">${TASK_ICON[t.status] ?? '●'} ${esc(t.title)}</span>
+            <span class="tag" style="font-size:11px">${esc(t.label)}${t.progress ? ` ${t.progress.done}/${t.progress.total}` : ''}</span>
+            ${t.stopped ? `<button class="ghost task-cancel" data-id="${esc(t.id)}" style="padding:4px 10px;font-size:11px">不做了</button>` : ''}
+          </div>
+          <div class="hint" style="margin:-4px 0 8px">${esc(t.question || t.hint || '')}${t.nextNudgeAt ? `（下次来问：${fmtTime(t.nextNudgeAt)}）` : ''}</div>`).join('')
+        : '<span style="color:var(--ink-faint)">没有半途而废的事——交代给 TA 的长活会在这里看得见进度</span>';
+      const stopAll = jobs.length
+        ? `<div style="margin:8px 0 2px"><button class="mg-btn" id="cron-stop-all">全部停掉</button>
+             <span class="hint" style="margin-left:8px">停掉之后她不会自己开回来；想恢复就一条条重设</span></div>`
+        : '';
+      $('jobs-body').innerHTML = (jobs.length
+        ? `<div class="hint" style="margin:12px 0 4px">定时任务</div>` + jobs.map((j) => `<div class="provider">
+            <span class="name">⏰ ${esc(j.task)}</span>
+            <span class="model num">${j.kind === 'once' ? esc(j.spec).slice(0, 16) : `下次 ${fmtTime(j.nextRunAt)}`}</span>
+            <button class="ghost job-cancel" data-id="${esc(j.id)}" style="padding:4px 10px;font-size:11px">取消</button>
+          </div>`).join('') + stopAll
+        : '');
+      /* **你不在的时候我没做**那些事（攒着等你回来）。
+         异步取回，所以渲染完再回填一块（renderTasks 不是 async——别把 await 写进同步函数）。 */
+      void renderBgBlocked();
+      document.querySelectorAll('.task-cancel').forEach((b) => b.addEventListener('click', async () => {
+        const r = await window.api.taskControl(b.dataset.id, 'cancel');
+        setResult('tasks-result', r.ok ? '好，这件事不做了。' : (r.error ?? ''), r.ok);
+        refresh();
+      }));
+      // （事件绑定在 renderBgBlocked 里，因为那块的 DOM 是异步回填的）
+      document.querySelectorAll('.job-cancel').forEach((b) => b.addEventListener('click', async () => {
+        const r = await window.api.cronCancel(b.dataset.id);
+        setResult('tasks-result', r.ok ? '好，这个定时任务取消了。' : (r.error ?? ''), r.ok);
+        refresh();
+      }));
+      $('cron-stop-all')?.addEventListener('click', async () => {
+        const r = await window.api.cronStopAll?.().catch(() => null);
+        setResult('tasks-result', r?.ok
+          ? `好，${r.stopped} 个都停了——是你让我停的，我不会自己开回来。`
+          : ('没停成：' + (r?.error ?? '')), !!r?.ok);
+        refresh();
+      });
+      document.querySelectorAll('.bg-now').forEach((b) => b.addEventListener('click', async () => {
+        await window.api.bgBlockedClear?.(b.dataset.id);
+        // 「现在做」= 请她**在有人的时候重做一遍**（攒的卡里只有粗粒度摘要，没有参数可重放）
+        window.api.chat?.('你刚才想做的那件事，现在做吧');
+        setResult('tasks-result', DT('manage.js.result.1', '好，我让她现在做——该问你的地方还是会问你。'), true);
+        refresh();
+      }));
+      document.querySelectorAll('.bg-drop').forEach((b) => b.addEventListener('click', async () => {
+        await window.api.bgBlockedClear?.(b.dataset.id);
+        setResult('tasks-result', DT('manage.js.result.2', '好，那件不做了。'), true);
+        refresh();
+      }));
+    }
+
+    /* 无人值守时被拒的那些事——攒着等你回来，一次处理完。
+       「现在做」= 让她**在有人的时候重做一遍**（卡里只有粗粒度摘要，没有参数可重放；
+       这样也不用担心攒的卡本身泄露什么）。 */
+    async function renderBgBlocked() {
+      const box = $('jobs-body'); if (!box) return;
+      const r = await window.api.bgBlockedList?.().catch(() => null);
+      const items = r?.items ?? [];
+      if (!items.length) return;
+      const wrap = document.createElement('div');
+      wrap.innerHTML = `<div class="hint" style="margin:12px 0 4px">你不在的时候，我没做的 ${items.length} 件事</div>`
+        + items.map((b) => `<div class="provider"><span class="name">${esc(b.summary)}</span>
+            <span class="model num">${fmtTime(b.at)}</span>
+            <button class="ghost bg-now" data-id="${esc(b.id)}" style="padding:4px 10px;font-size:11px">现在做</button>
+            <button class="ghost bg-drop" data-id="${esc(b.id)}" style="padding:4px 10px;font-size:11px">不用了</button></div>`).join('');
+      box.prepend(wrap);
+      wrap.querySelectorAll('.bg-now').forEach((b) => b.addEventListener('click', async () => {
+        await window.api.bgBlockedClear?.(b.dataset.id);
+        window.api.chat?.('你刚才想做的那件事，现在做吧');
+        setResult('tasks-result', DT('manage.js.result.3', '好，我让她现在做——该问你的地方还是会问你。'), true);
+        refresh();
+      }));
+      wrap.querySelectorAll('.bg-drop').forEach((b) => b.addEventListener('click', async () => {
+        await window.api.bgBlockedClear?.(b.dataset.id);
+        setResult('tasks-result', DT('manage.js.result.4', '好，那件不做了。'), true);
+        refresh();
+      }));
+    }
+
+    async function refresh() {
+      try {
+        const s = await window.api.status();
+        // 标题要显示她自己的名字；名字在 profile 里，取不到就退回 TA
+        const prof = await (window.api.petProfile?.() ?? Promise.resolve(null)).catch(() => null);
+        $('tb-name').textContent = prof?.selections?.name || 'TA';
+        const bound = s.bound !== false;
+        renderHero(s);
+        if (!bound) { $('save-status').textContent = '未绑定——导入出生包让 TA 出生'; return; }
+        $('save-status').textContent = s.degraded ? '⚠ 云端降级中' : '';
+        // 能力开关状态回灌
+        prefs = s.prefs ?? prefs;
+        voiceInfo = s.voice ?? voiceInfo;
+        renderPrefs();
+        // 打扰预算
+        const b = s.interruptionBudget ?? {};
+        /* 这页的问题**不是没功能**（数据都是真的），是**视觉撑不住一屏**：两行文字挂在顶端、下半屏全空。
+           所以：**配额给条、时段给时间轴**（0–24 点，安静那一段涂紫），空态也给出路。 */
+        const cap = Number(b.maxProactivePerDay ?? 3), used = Number(b.dailyCount ?? 0);
+        const qs = Number(b.quietStart ?? 23), qe = Number(b.quietEnd ?? 8);
+        // 安静时段可能在一天里绕一圈（23→8），所以画两段
+        const segs = qs === qe ? [] : (qs < qe ? [[qs, qe]] : [[qs, 24], [0, qe]]);
+        const pct = (h) => (h / 24 * 100);
+        const quietBars = segs.map(([a, z]) => `<span class="q" style="left:${pct(a)}%;width:${pct(z - a)}%"></span>`).join('');
+        const ticks = [0, 6, 12, 18].map((h) => `<span class="tick" style="left:${pct(h)}%"></span><span class="lb" style="left:${pct(h)}%">${h === 0 ? '0 点' : `${h} 点`}</span>`).join('')
+          + `<span class="lb" style="left:${pct(24)}%;transform:translateX(-100%)">24 点</span>`;
+        $('budget-body').innerHTML = `
+          <div class="row" style="display:block">
+            <span class="k">今天她主动找过你</span>
+            <span class="v"><b class="num">${used}</b> 次 <span class="sk-chip">上限 ${cap} 次</span>
+              <span style="float:right;color:var(--ink2)">${qs}:00 之后到 ${qe}:00 不主动出声</span></span>
+            <div class="mg-spend"><i style="width:${cap ? Math.min(100, Math.round(used / cap * 100)) : 0}%;background:var(--grad)"></i></div>
+            <div class="tl">${quietBars}${ticks}</div>
+            <div class="tl-note">紫色 = 安静时段（这段里她不主动出声；你说话她照样答）</div>
+          </div>`;
+        $('b-qs').value = b.quietStart ?? 23;
+        $('b-qe').value = b.quietEnd ?? 8;
+        $('b-cap').value = b.maxProactivePerDay ?? 3;
+        renderTasks(s.tasks ?? [], s.cronJobs ?? []);
+        renderCost();
+        void renderKpi();   // 她干得怎么样（五项）
+        void renderLang();  // 语言
+        // 权限
+        $('perm-body').innerHTML = s.permissions?.trusted
+          ? '<span class="tag amber">信任模式（操作全部放行）</span>'
+          : ((s.permissions?.apps?.length
+              ? s.permissions.apps.map((a) => `<span class="tag">${esc(a)}</span>`).join('')
+              : '<span style="color:var(--ink-faint)">未配置白名单（设备操作需逐次授权）</span>'));
+        // 大脑（卡片化 + 自由选模型 + 面板配密钥）
+        const llm = await window.api.llmProviders();
+        // 徽章带上延迟（状态要看得见 ms）
+        const connBadge = (p) => (p.connected === true
+          ? ` <span class="tag" style="border-color:var(--ok-a50);color:var(--ok);font-size:11px">✓ 已连通${p.testMs ? ` · ${p.testMs}ms` : ''}</span>`
+          : p.connected === false ? ' <span class="tag" style="border-color:var(--bad-a50);color:var(--bad);font-size:11px">✗ 连不通</span>' : '');
+        // 「获取 API Key ↗」：纯外链，**不需要密钥明文**，所以这条能跟。
+        // 只认已知厂商；其余（含自定义）不显示 —— 宁可不给，也别给一个猜的地址。
+        const KEY_PAGES = {
+          deepseek: 'https://platform.deepseek.com/api_keys',
+          openai: 'https://platform.openai.com/api-keys',
+          anthropic: 'https://console.anthropic.com/settings/keys',
+          qwen: 'https://bailian.console.aliyun.com/?apiKey=1',
+          dashscope: 'https://bailian.console.aliyun.com/?apiKey=1',
+        };
+        const keyLink = (p) => (KEY_PAGES[p.name]
+          ? `<button class="brain-link" data-url="${KEY_PAGES[p.name]}" title="在浏览器里打开官方密钥页">获取密钥 ↗</button>`
+          : '');
+        // **本地端点本来就不需要钥匙** —— 别报「未配置密钥」（那是误导）。
+        // 只认 loopback（localhost / 127.0.0.1 / [::1] / 0.0.0.0）：局域网主机是否要钥匙只有用户知道，
+        // 不替他假设。
+        const isLocalEndpoint = (p) => /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0)(:\d+)?(\/|$)/i.test(String(p.baseUrl ?? ''));
+        const keyBadge = (p) => (p.keyFrom
+          ? `<span class="key-pill ok">密钥·${p.keyFrom}</span>`
+          : isLocalEndpoint(p)
+            ? '<span class="key-pill">本地 · 无需钥匙</span>'
+            : '<span class="key-pill bad">未配置密钥</span>');
+        const modelOpts = (p) => {
+          const opts = p.modelList.map((m) =>
+            `<option value="${esc(m.id)}" ${m.id === p.activeModel ? 'selected' : ''}>${esc(m.id)}${m.thinking ? '（深度思考）' : ''}</option>`).join('');
+          const overridden = !p.modelList.some((m) => m.id === p.activeModel);
+          return opts
+            + (overridden ? `<option value="${esc(p.activeModel)}" selected>${esc(p.activeModel)}（当前自定义）</option>` : '')
+            + '<option value="__custom__">✎ 其他模型名…</option>';
+        };
+        $('llm-body').innerHTML = llm.providers.map((p) => `
+          <div class="brain-card${p.active ? ' active' : ''}" data-prov="${esc(p.name)}">
+            <div class="brain-head">
+              <span class="mg-logo" aria-hidden="true">${esc((p.name || '?').trim()[0] || '?')}</span>
+              <span class="radio use-brain" data-prov="${esc(p.name)}" title="${p.active ? '当前大脑' : '设为大脑'}"></span>
+              <div class="brain-title">
+                <b>${esc(p.name)}</b>
+                ${p.custom ? '<span class="tag amber">自定义</span>' : '<span class="tag">内置</span>'}
+              </div>
+              <span class="brain-sub">${keyBadge(p)}${connBadge(p)}</span>
+              <span class="brain-model">${esc(p.activeModel)}${p.models.reasoner === p.activeModel ? ' · 深度' : ''}</span>
+              ${!p.active ? `<button class="ghost use-brain" data-prov="${esc(p.name)}">设为大脑</button>` : '<span class="tag on">使用中</span>'}
+              <button class="brain-toggle" title="配置模型 / 密钥" aria-label="配置模型或密钥"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5 12 15.5 18 9.5"/></svg></button>
+            </div>
+            <div class="brain-ops">
+              <div class="op-row">
+                <span style="flex-shrink:0">模型</span>
+                <select class="bm-select" data-prov="${esc(p.name)}">${modelOpts(p)}</select>
+                <input type="text" class="bm-custom" data-prov="${esc(p.name)}" placeholder="输入模型名（如 deepseek-v4-flash）" style="display:none" />
+                <button class="ghost bm-apply" data-prov="${esc(p.name)}" style="display:none;padding:5px 12px;font-size:11px">应用</button>
+                <button class="ghost bm-fetch" data-prov="${esc(p.name)}" title="去厂商那里拉一次当前可用的模型（只读请求，不花钱）">拉取可用模型</button>
+              </div>
+              <div class="op-row">
+                <span style="flex-shrink:0">密钥</span>
+                <input type="password" class="bk-input" data-prov="${esc(p.name)}" placeholder="${p.keyFrom === '面板' ? '已保存——输入新值可更新' : p.keyFrom === '环境' ? '来自环境变量——可在此覆盖' : isLocalEndpoint(p) ? '本地服务一般不需要钥匙（要就填）' : '粘贴 API Key（sk-…）'}" />
+                ${keyLink(p)}
+                <button class="ghost bk-save" data-prov="${esc(p.name)}">保存密钥</button>
+                <button class="ghost brain-test" data-prov="${esc(p.name)}" title="用已保存的密钥真连一次（不花钱：只发一句你好）">测试连接</button>
+                ${p.custom ? `<button class="ghost bl-remove" data-prov="${esc(p.name)}">删除</button>` : ''}
+              </div>
+              ${p.baseUrl ? `<div class="hint" style="margin:0">端点 ${esc(p.baseUrl)}</div>` : ''}
+            </div>
+          </div>`).join('')
+          + `<div class="row"><span class="k">检测档位</span><span class="v">${esc(llm.tier.info[llm.tier.detected]?.label ?? llm.tier.detected)}</span></div>
+          <div class="row"><span class="k">当前生效</span><span class="v ok">${esc(llm.tier.info[llm.tier.selected]?.label ?? llm.tier.selected)}</span></div>
+          <div class="hint">${(llm.tier.reasons ?? []).map((r) => '· ' + esc(r)).join('<br>')}</div>`;
+        // 顶部统计（"已启服务 N 个 · 可用模型 M 个"）
+        const stEl = $('llm-stats');
+        if (stEl) {
+          const svc = (llm.providers ?? []).length;
+          const models = (llm.providers ?? []).reduce((n, p) => n + (p.modelList?.length ?? 0), 0);
+          const cur = (llm.providers ?? []).find((p) => p.active);
+          const okN = (llm.providers ?? []).filter((p) => p.connected === true).length;
+          stEl.textContent = `已配置服务 ${svc} 个（测过通的 ${okN} 个）· 可选模型 ${models} 个 · 现在用的是「${cur?.name ?? '—'}」`;
+        }
+        renderTierCards(llm.tier);
+        // 档位要说清"到底生效了什么"（没有本地端点就把话说明白）
+        if ($('tier-note')) $('tier-note').textContent = llm.tier.note ?? '';
+        // 大脑卡片交互（事件委托——refresh 重渲后无需重绑）
+        $('llm-body').onclick = async (e) => {
+          const card = e.target.closest('.brain-card');
+          const prov = card?.dataset.prov;
+          if (e.target.closest('.use-brain')) {
+            const r = await window.api.llmSetProvider(prov);
+            setResult('llm-result', r.ok ? `✅ 已切换大脑 → ${r.provider}（下次对话生效；人格由宪法保证不变）` : '切换失败：' + (r.error ?? ''), r.ok);
+            refresh();
+            return;
+          }
+          if (e.target.closest('.brain-toggle')) {
+            card.classList.toggle('open');     // 改切 class（箭头是 SVG，不靠换文字表达开合）
+            return;
+          }
+          if (e.target.closest('.brain-link')) {                    // 开官方密钥页（只在浏览器里开，不在应用内导航）
+            const b = e.target.closest('.brain-link');
+            const r2 = await window.api.openExternal?.(b.dataset.url).catch(() => null);
+            if (r2 && r2.ok === false) setResult('llm-result', DT('manage.js.result.5', '没能打开浏览器：') + (r2.error ?? ''), false);
+            return;
+          }
+          if (e.target.closest('.brain-test')) {                      // 测「已保存」的厂商
+            const b = e.target.closest('.brain-test');
+            b.textContent = '测试中…'; b.disabled = true;
+            const r = await window.api.llmTestSaved?.(prov).catch(() => null);
+            b.textContent = '测试连接'; b.disabled = false;
+            setResult('llm-result', r?.connected ? `✅ ${prov}：${r.note ?? '连通正常'}` : `✗ ${prov} 连不通：${r?.error ?? '没拿到结果'}`, r?.connected === true);
+            if (r?.connected) refresh();                              // 让徽章立刻亮起来（带 ms）
+            return;
+          }
+          if (e.target.closest('.bk-save')) {
+            const input = card.querySelector('.bk-input');
+            const r = await window.api.llmKeySet(prov, input.value.trim());
+            setResult('llm-result', r.ok ? `✅ ${prov} 密钥已${input.value.trim() ? '保存（立即生效，下次对话即用）' : '清除'}` : '保存失败：' + (r.error ?? ''), r.ok);
+            refresh();
+            return;
+          }
+          if (e.target.closest('.bl-remove')) {
+            const r = await window.api.llmCustomRemove(prov);
+            setResult('llm-result', r.ok ? `已删除自定义大脑 ${prov}` : r.error ?? '', r.ok);
+            refresh();
+            return;
+          }
+          if (e.target.closest('.bm-fetch')) {
+            const btn = e.target.closest('.bm-fetch');
+            btn.textContent = '拉取中…';
+            const r = await window.api.llmFetchModels(btn.dataset.prov);
+            setResult('llm-result', r.ok ? `✅ 拉到 ${r.count} 个模型（已进下拉：${r.ids.slice(0, 4).join('、')}${r.ids.length > 4 ? '…' : ''}）` : `拉取失败：${r.error ?? ''}`, r.ok);
+            refresh();
+            return;
+          }
+          if (e.target.closest('.bm-apply')) {
+            const customInput = card.querySelector('.bm-custom');
+            const m = customInput.value.trim();
+            if (!m) { setResult('llm-result', DT('manage.js.result.6', '请输入模型名'), false); return; }
+            const r = await window.api.llmModelSet(prov, m);
+            setResult('llm-result', r.ok ? `✅ ${prov} 主模型 → ${r.model}（下次对话生效）` : '切换失败：' + (r.error ?? ''), r.ok);
+            refresh();
+          }
+        };
+        // 模型下拉（change 事件比 option 点击可靠）
+        $('llm-body').onchange = async (e) => {
+          const sel = e.target.closest('.bm-select');
+          if (!sel) return;
+          const card = sel.closest('.brain-card');
+          const prov = sel.dataset.prov;
+          const v = sel.value;
+          if (v === '__custom__') {
+            card.querySelector('.bm-custom').style.display = '';
+            card.querySelector('.bm-apply').style.display = '';
+            card.querySelector('.bm-custom').focus();
+            return;
+          }
+          const r = await window.api.llmModelSet(prov, v);
+          setResult('llm-result', r.ok ? `✅ ${prov} 主模型 → ${v}（下次对话生效）` : '切换失败：' + (r.error ?? ''), r.ok);
+          refresh();
+        };
+        // 社交（保留拓展：我的地址展示 + 复制）
+        const social = await window.api.socialInbox().catch(() => ({ ok: false }));
+        $('social-body').innerHTML = (social.ok === false
+          ? '<span style="color:var(--ink-faint)">社交服务未连接</span>'
+          : (social.graph?.length
+              ? social.graph.map((g) => `<div class="row"><span class="k">${esc(g.peer.slice(0, 10))}…</span><span class="v">${LEVELS[g.level] ?? g.level}</span></div>`).join('')
+              : '<span style="color:var(--ink-faint)">还没有好友——TA 的社交世界等着你打开</span>'))
+          + (social.marriage && !social.marriage.dissolved ? `<div class="row"><span class="k">婚姻</span><span class="v">💍 已婚（契约 ${esc(social.marriage.contract_hash?.slice(0, 8))}…）</span></div>` : '')
+          + (social.marriage?.dissolved ? '<div class="row"><span class="k">婚姻</span><span class="v">已解除（共享记忆只读归档）</span></div>' : '')
+          + `<div class="row"><span class="k">信件往来</span><span class="v"><b class="num">${social.messages?.length ?? 0}</b> 条</span></div>`
+          + `<div class="row"><span class="k">待处理</span><span class="v">好友请求 <b class="num">${social.pendingLinks?.length ?? 0}</b> / 其他 <b class="num">${social.pendingItems?.length ?? 0}</b></span></div>`
+          + (social.address ? `<div class="row"><span class="k">我的地址</span><span class="v num">${esc(social.address)} <button class="ghost copy-addr" style="padding:3px 8px;font-size:11px">复制</button></span></div>` : '');
+        document.querySelectorAll('.copy-addr').forEach((b) => b.addEventListener('click', async () => {
+          await navigator.clipboard.writeText(social.address);
+          b.textContent = '✓ 已复制';
+        }));
+        // 衣柜：按"她身上现在穿哪件 + 每件怎么来的"重画。
+        await renderWardrobe();
+        // 完整对话历史在个性化页；这里不留 #history-body/#files-body 两个空壳
+        // （死元素 + 每轮白跑一次 chatHistory）。
+        renderST();
+      } catch (e) {
+        // 人话化:技术错误只进 diag,界面只说人话
+        $('save-status').textContent = '有几项没加载出来，重开这个窗口就好。';
+        try { window.api?.birthDiag?.('[manage] 加载失败: ' + (e?.message ?? e)); } catch { /* 忽略 */ }
+      }
+    }
+
+    /* ---- 常用能力卡 ----
+       每张卡按下去都**真的有事发生**（摆一张点不动的瓦片比不放更糟）：
+       处理文件 → 选文件交给她；看我的屏幕 → 走屏幕观察那条路；帮我安排 / 定时任务 → 开「帮我安排」三页；
+       查资料 / 写点东西 → 打开家页并**预填**一句开头（`home-prefill`，不替用户代言，只补个话头）。 */
+    const CAP_TILES = [
+      { ic: '📄', t: '处理文件', d: 'Word / Excel / PDF / 图片，改完另存新文件', act: () => window.api.petFileTask?.() },
+      { ic: '👀', t: '看我的屏幕', d: '看一眼屏幕，说说看到什么', act: () => window.api.petScreenshot?.() },
+      { ic: '📋', t: '帮我安排', d: '提醒、日程、计划', act: () => window.api.arrangeOpen?.() },
+      { ic: '🔎', t: '查资料', d: '搜、读、给你一份结论', act: () => window.api.homePrefill?.('帮我找找：') },
+      { ic: '✍️', t: '写点东西', d: '报告、邮件、文案', act: () => window.api.homePrefill?.('帮我写：') },
+      { ic: '⏰', t: '定时任务', d: '每天几点做什么', act: () => window.api.arrangeOpen?.('plan') },
+    ];
+    function renderCaps() {
+      const box = $('cap-grid');
+      if (!box) return;
+      box.innerHTML = CAP_TILES.map((c, i) => `<button class="cap-tile" data-cap="${i}">`
+        + `<span class="ci">${c.ic}</span><span><span class="ct">${esc(c.t)}</span><span class="cd">${esc(c.d)}</span></span></button>`).join('');
+      box.querySelectorAll('.cap-tile').forEach((b) => b.addEventListener('click', () => CAP_TILES[Number(b.dataset.cap)].act()));
+    }
+    renderCaps();
+
+    // ---- 技能库渲染（来源区分 + 启用开关） ----
+    /* ---- 技能 + MCP 一个渲染口，分页签切换 + 搜索过滤 ----
+       列表行语言：图标/名字 + 一句说明 + 右侧开关（说明就在行里，不再单独一行 hint）。 */
+    let stTab = 'skill';
+    let stQuery = '';
+    function stEmpty(msg) { return `<span class="st-empty">${msg}</span>`; }
+    async function renderST() {
+      const body = $('st-body');
+      if (!body) return;
+      $('st-add-skill').hidden = stTab !== 'skill';
+      $('st-add-mcp').hidden = stTab !== 'mcp';
+      document.querySelectorAll('#st-tabs .st-tb').forEach((b) => b.classList.toggle('on', b.dataset.t === stTab));
+      const q = stQuery.trim().toLowerCase();
+      const hit = (...xs) => !q || xs.some((x) => String(x ?? '').toLowerCase().includes(q));
+      if (stTab === 'skill') {
+        const r = await window.api.skillsList().catch(() => ({ ok: false, skills: [] }));
+        const items = (r.skills ?? []).filter((x) => hit(x.name, x.title, x.summary, x.description));
+        /* 技能行的三处约束：
+           ① 主标题是**显示名**（`title`），kebab 真名只在「详情」里（那里是排障信息）；
+           ② 「禁用」不能是**单向门**——要有**启用/停用开关 + 状态胶囊**，两边都能走；
+           ③ 反馈行跟着页签走 → 切页签清空。 */
+        body.innerHTML = items.length
+          ? items.map((s) => {
+            const src = s.source === 'installed' ? '📦 装来的' : s.source === 'self-distilled' ? '✨ 自己提炼的' : esc(s.source ?? '');
+            const on = s.enabled !== false;
+            // ⚠ 显示名的兜底也**不许退回 kebab 真名**：后端没给 title 时自己人话化。
+            //   「不许出现技术字段」这条保证要落在**界面**这一层，而不是指望每个调用方都记得传。
+            const disp = String(s.title || String(s.name ?? '').replace(/[-_]+/g, ' ')).trim() || '未命名';
+            return `<div class="sk-row" data-name="${esc(s.name)}">
+              <span class="mg-logo" aria-hidden="true">${esc(disp[0] || '?')}</span>
+              <span class="sk-main">
+                <div class="sk-nm">${esc(disp)}</div>
+                <div class="sk-ds" title="${esc(s.description ?? '')}">${esc(s.summary || s.description || '')}${src ? ` · ${src}` : ''}</div>
+              </span>
+              <span class="sk-rt">
+                <span class="sk-chip${on ? ' on' : ''}">${on ? '已启用' : '已停用'}</span>
+                <button class="sw${on ? '' : ' off'} sk-toggle" role="switch" aria-checked="${on}" aria-label="${on ? '停用' : '启用'} ${esc(disp)}"></button>
+                <button class="ghost sk-info" style="padding:4px 10px;font-size:11px">详情 ›</button>
+              </span>
+            </div>`;
+          }).join('')
+          : stEmpty(q ? `没搜到叫「${esc(stQuery.trim())}」的技能` : '还没有技能——在下面装一个，她也会自己提炼');
+        document.querySelectorAll('.sk-toggle').forEach((b) => b.addEventListener('click', async () => {
+          const row = b.closest('.sk-row');
+          const name = row.dataset.name;
+          const next = b.getAttribute('aria-checked') !== 'true';
+          const r2 = await window.api.skillSetEnabled(name, next);
+          // 反馈用**显示名**说人话（真名只进详情）：`已停用「造技能」`，不是 `已禁用 skill-creator`
+          const title = row.querySelector('.sk-nm')?.textContent ?? name;
+          setResult('st-result', r2.ok ? `已${next ? '启用' : '停用'}「${title}」` : r2.error ?? '', r2.ok);
+          renderST();
+        }));
+        document.querySelectorAll('.sk-info').forEach((b) => b.addEventListener('click', () => {
+          const row = b.closest('.sk-row');
+          const name = row.dataset.name;
+          const s2 = items.find((x) => x.name === name) ?? {};
+          UI2.Modal({
+            title: `${s2.title || name}`,
+            body: `${s2.description || '（这个技能没写说明）'}\n\n真名：${name}\n来源：${s2.source || '未知'}\n位置：${s2.dir || ''}`,
+            actions: [],
+          });
+        }));
+      } else {
+        const r = await window.api.mcpList().catch(() => ({ ok: false, servers: [] }));
+        const servers = (r.servers ?? []).filter((x) => hit(x.name, x.url));
+        body.innerHTML = servers.length
+          ? servers.map((m) => `<div class="provider">
+              <span class="mg-logo" aria-hidden="true">${esc((m.name || '?').trim()[0] || '?')}</span>
+              <span class="name">${esc(m.name)}</span>
+              <span class="model">${esc(m.url)}${m.enabled === false ? ' · 已停用' : ''}</span>
+              <button class="sw${m.enabled === false ? ' off' : ''} mcp-toggle" data-name="${esc(m.name)}" data-on="${m.enabled !== false}" role="switch" aria-checked="${m.enabled !== false}" aria-label="启用 ${esc(m.name)}"></button>
+            </div>`).join('')
+          : stEmpty(q ? `没搜到叫「${esc(stQuery.trim())}」的服务` : '还没有接 MCP 服务——在下面填名称和地址');
+        document.querySelectorAll('.mcp-toggle').forEach((b) => b.addEventListener('click', async () => {
+          const r2 = await window.api.mcpSetEnabled(b.dataset.name, b.dataset.on !== 'true');
+          setResult('st-result', r2.ok ? `${b.dataset.name} 已${r2.enabled ? '启用' : '禁用'}（下次启动生效）` : r2.error ?? '', r2.ok);
+          renderST();
+        }));
+      }
+    }
+    for (const b of document.querySelectorAll('#st-tabs .st-tb')) {
+      // 提示行**跟着页签走**——切走就清（否则会残留上一页的反馈）
+      b.addEventListener('click', () => { stTab = b.dataset.t; setResult('st-result', ''); renderST(); });
+    }
+    $('st-search')?.addEventListener('input', (e) => { stQuery = e.target.value; renderST(); });
+
+    /* ---- 衣柜页 ----
+       约束：① 说明文案不能**写死**（要随实际变）；
+       ② 非礼物件不能把 `origin` 原样上屏（会出现 `birth` 这种内部码）。 */
+    const ORIGIN_WORD = { birth: '出生那天的', gift: '🎁 礼物', earned: '她自己挣来的', bought: '你给她买的' };
+    async function renderWardrobe() {
+      const box = $('wardrobe-body');
+      if (!box) return;
+      const w = await window.api.wardrobe().catch(() => ({ items: [] }));
+      const items = w.items ?? [];
+      const worn = items.find((i) => i.worn)?.id ?? null;
+      if ($('wd-count')) $('wd-count').textContent = items.length ? `一共 ${items.length} 件` : '';
+      if (!items.length) {
+        box.innerHTML = `<div class="fh-row"><span class="fh-main"><div class="fh-nm">衣柜还是空的</div>`
+          + `<div class="fh-ds">她出生时会有基础款；往后的衣服来自礼物或她自己挣来。</div></span></div>`;
+        return;
+      }
+      box.innerHTML = items.map((i, idx) => {
+        // 来源一律人话（查不到的内部码**不上屏**，退回中性词）
+        const origin = ORIGIN_WORD[i.origin] ?? '她自己的';
+        const on = i.id === worn;
+        return `<div class="sk-row" data-i="${idx}">
+          <span class="mg-logo" aria-hidden="true">${i.category === 'accessory' ? '🧣' : i.category === 'dress' ? '👗' : i.category === 'bottom' ? '👖' : '👕'}</span>
+          <span class="sk-main"><div class="sk-nm">${esc(i.name)} <span class="sk-chip${on ? ' on' : ''}">${on ? '穿着呢' : esc(origin)}</span></div>
+          <div class="sk-ds" title="${esc(i.story ?? '')}">${esc(i.story ?? '')}</div></span>
+          <span class="sk-rt">${on ? '' : `<button class="ghost wd-wear" style="padding:4px 10px;font-size:11px">换上</button>`}</span>
+        </div>`;
+      }).join('');
+      box.querySelectorAll('.wd-wear').forEach((b) => b.addEventListener('click', async () => {
+        const it = items[Number(b.closest('.sk-row').dataset.i)];
+        const r = await window.api.outfitWear?.(it.id).catch(() => null);
+        if (r?.ok !== false) { UI2.Toast(`好，换上「${it.name}」了`, 'ok'); renderWardrobe(); }
+        else UI2.Toast(r?.error ?? '没换上，再试一次', 'err');
+      }));
+    }
+
+    /* ---- 文件页 ----
+       一行式：类型块 +（**文件名当主标题** + 一句话）+ 时间 + ⋯。
+       两个动作横排会把名字挤成省略号，所以「在访达显示 / 复制路径」收进 ⋯（主按钮只留「打开」）。 */
+    const FH_KIND = { doc: 'DOC', sheet: 'XLS', pdf: 'PDF', img: 'IMG', other: 'FILE' };
+    function fhTime(at) {
+      if (!at) return '';
+      const d = new Date(at);
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      if (d.getTime() >= today.getTime()) return `今天 ${hm}`;
+      const y = new Date(today.getTime() - 86400000);
+      if (d.getTime() >= y.getTime()) return `昨天 ${hm}`;
+      return `${d.getMonth() + 1} 月 ${d.getDate()} 日`;
+    }
+    async function renderFiles() {
+      const box = $('fh-box');
+      if (!box) return;
+      const r = await window.api.fileHistory?.(60).catch(() => null);
+      const files = r?.files ?? [];
+      if (!files.length) {
+        box.innerHTML = `<div class="fh-row" id="fh-empty"><span class="fh-main">`
+          + `<div class="fh-nm">还没有经手过文件</div>`
+          + `<div class="fh-ds">把文件拖进她的窗口、或说一句「帮我处理这个文件」，这里就会记下来。</div>`
+          + `</span></div>`;
+        return;
+      }
+      box.innerHTML = files.map((f, i) => `<div class="fh-row k-${esc(f.kind)}${f.exists ? '' : ' gone'}" data-i="${i}">`
+        + `<span class="fh-kind">${FH_KIND[f.kind] ?? 'FILE'}</span>`
+        + `<span class="fh-main"><div class="fh-nm" title="${esc(f.path)}">${esc(f.name)}</div>`
+        + `<div class="fh-ds">${esc(f.act ? `她${f.act}` : '她经手过')}${f.exists ? '' : ' · 文件已经不在了'}</div></span>`
+        + `<span class="fh-rt"><span class="fh-at">${fhTime(f.at)}</span>`
+        + `<button class="ghost fh-open" style="padding:4px 10px;font-size:11px">打开</button>`
+        + `<button class="ghost fh-more-b" style="padding:4px 10px;font-size:11px" title="更多">⋯</button></span>`
+        + `</div>`).join('');
+      box.querySelectorAll('.fh-open').forEach((b) => b.addEventListener('click', () => {
+        const f = files[Number(b.closest('.fh-row').dataset.i)];
+        window.api.previewFile?.(f.path).then((x) => {
+          if (x?.ok) window.api.previewOpenExternal?.(f.path);
+          else UI2.Toast(x?.error ?? '这个文件打不开（可能已经不在了）', 'err');
+        });
+      }));
+      box.querySelectorAll('.fh-more-b').forEach((b) => b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const row = b.closest('.fh-row');
+        const f = files[Number(row.dataset.i)];
+        const old = row.querySelector('.fh-more');
+        if (old) { old.remove(); return; }
+        const bar = document.createElement('span');
+        bar.className = 'fh-more';
+        const inFinder = document.createElement('button'); inFinder.textContent = '在访达里显示';
+        inFinder.onclick = () => window.api.previewReveal?.(f.path);
+        const copy = document.createElement('button'); copy.textContent = '复制路径';
+        copy.onclick = () => { navigator.clipboard?.writeText(f.path); UI2.Toast(DT('manage.js.toast.1', '路径已复制'), 'ok'); };
+        bar.append(inFinder, copy);
+        row.querySelector('.fh-rt').append(bar);
+      }));
+    }
+
+    // ---- 能力开关渲染（整卡可点 + 状态 pill） ----
+    const sysRec = (name) => (voiceInfo.gender === 'male' ? /sinji/i.test(name) : /tingting|meijia/i.test(name));
+    function renderPrefs() {
+      const sp = $('speech-card'), gl = $('global-card');
+      sp.classList.toggle('on', !!prefs.speechEnabled);
+      gl.classList.toggle('on', prefs.globalVisible !== false);
+      swState($('speech-toggle'), prefs.speechEnabled);
+      swState($('global-toggle'), prefs.globalVisible !== false);
+      const opts = [];
+      /* 音色按**当前界面语言**分组。
+         云音色只有中文那一组核实过；别的语言（en/ja/ko）**还没逐音色核实**——
+         如实说，并且只列本机音色（不摆一排点了没声的"可选"，那是假的）。 */
+      const langPrefix = (() => { try { return String(window.I18N?.locale ?? 'zh-CN').toLowerCase().split('-')[0]; } catch { return 'zh'; } })();
+      const poolOk = voiceInfo.poolVerified !== false && langPrefix === 'zh';
+      if (poolOk) {
+        opts.push(`<option value="cloud:" ${prefs.voiceEngine === 'cloud' && !prefs.voiceName ? 'selected' : ''}>☁️ 云端推荐（${voiceInfo.gender === 'male' ? '男声' : '女声'} · ${voiceInfo.recommended}，随人物设定）</option>`);
+        const pool = voiceInfo.cloudVoices?.[voiceInfo.gender] ?? [];
+        for (const v of pool) {
+          opts.push(`<option value="cloud:${v}" ${prefs.voiceEngine === 'cloud' && prefs.voiceName === v ? 'selected' : ''}>☁️ 云端 ${v}${v === voiceInfo.recommended ? ' ⭐' : ''}</option>`);
+        }
+      } else {
+        opts.push(`<option value="" selected>💻 这个语言先用本机音色（云端音色还没核实过）</option>`);
+      }
+      const sys = speechSynthesis.getVoices().filter((v) => (v.lang || '').toLowerCase().startsWith(langPrefix));
+      for (const v of sys) {
+        opts.push(`<option value="system:${v.name}" ${prefs.voiceEngine === 'system' && prefs.voiceName === v.name ? 'selected' : ''}>💻 系统 ${v.name}（${v.lang}）${sysRec(v.name) ? ' ⭐' : ''}</option>`);
+      }
+      $('voice-select').innerHTML = opts.join('');
+      window.__prefsRendered = true; // 渲染完成标记（测试断言用）
+    }
+
+    // ---- 事件绑定 ----
+    $('speech-card').addEventListener('click', async (e) => {
+      if (e.target.closest('select')) return;
+      const r = await window.api.prefSet('speechEnabled', !prefs.speechEnabled);
+      if (r?.ok) {
+        prefs = r.prefs; renderPrefs();
+        setResult('speech-result', prefs.speechEnabled ? '✅ TA 会开口说话' : '✅ 已静音：只显示气泡', true);
+      } else setResult('speech-result', DT('manage.js.result.7', '保存失败：') + (r?.error ?? ''), false);
+    });
+    $('global-card').addEventListener('click', async () => {
+      const r = await window.api.prefSet('globalVisible', prefs.globalVisible === false);
+      if (r?.ok) {
+        prefs = r.prefs; renderPrefs();
+        setResult('global-result', prefs.globalVisible !== false ? '✅ 任何应用上都看得到 TA' : '✅ TA 只出现在当前空间', true);
+      } else setResult('global-result', DT('manage.js.result.8', '保存失败：') + (r?.error ?? ''), false);
+    });
+    $('screen-card').addEventListener('click', async () => {
+      const r = await window.api.petScreenToggle();
+      screenActive = r.active;
+      $('screen-card').classList.toggle('on', screenActive);
+      swState($('screen-toggle'), screenActive);
+      setResult('screen-result', screenActive ? '✅ 已开启（每 45 秒观察一次）' : '已关闭', screenActive);
+    });
+    $('voice-select').addEventListener('change', async () => {
+      const [engine, name] = $('voice-select').value.split(':');
+      const r1 = await window.api.prefSet('voiceEngine', engine || 'cloud');
+      const r2 = await window.api.prefSet('voiceName', (engine === 'cloud' && !name) ? '' : (name ?? ''));
+      if (r1?.ok && r2?.ok) {
+        prefs = r2.prefs; renderPrefs();
+        setResult('voice-result', DT('manage.js.result.9', '✅ 已切换音色（下次回答生效并记住）'), true);
+      } else setResult('voice-result', DT('manage.js.result.10', '切换失败：') + ((r1?.error ?? '') || (r2?.error ?? '')), false);
+    });
+    $('b-save').addEventListener('click', async () => {
+      const r = await window.api.budgetSet({
+        quietStart: Number($('b-qs').value),
+        quietEnd: Number($('b-qe').value),
+        maxProactivePerDay: Number($('b-cap').value),
+      });
+      setResult('b-result', r.ok ? '✅ 已保存' : '保存失败：' + (r.error ?? ''), r.ok);
+      refresh();
+    });
+    /* 档位卡——**每一档都写清"她能做到什么"**，点了即刻生效
+       （不再要一次"保存"：一次点击能说完的事，别让用户点两次）。 */
+    function renderTierCards(tier) {
+      const box = $('tier-cards');
+      if (!box || !tier) return;
+      const info = tier.info ?? {};
+      const auto = tier.selected === tier.detected;
+      const cards = [{ id: 'auto', label: '自动', desc: `跟着这台机器来（现在：${info[tier.detected]?.label ?? tier.detected}）` }]
+        .concat(Object.entries(info).map(([id, v]) => ({
+          id, label: String(v.label).replace(/（默认）$/, ''),
+          desc: `${v.tier1}${v.offline ? ` · 离线：${v.offline}` : ''}`,
+        })));
+      box.innerHTML = cards.map((c) => {
+        const on = c.id === 'auto' ? auto : (!auto && tier.selected === c.id);
+        return `<div class="t${on ? ' on' : ''}" data-tier="${esc(c.id)}" role="radio" aria-checked="${on}">`
+          + `<div class="tt">${esc(c.label)}${on ? '<span class="now">现在</span>' : ''}</div>`
+          + `<div class="td">${esc(c.desc)}</div></div>`;
+      }).join('');
+      box.querySelectorAll('.t').forEach((el) => el.addEventListener('click', async () => {
+        const r = await window.api.llmTierSet(el.dataset.tier);
+        // 反馈说人话：不把 all-local / hybrid / cloud-only 端到用户脸上
+        setResult('llm-result', r.ok ? '✅ 档位已切换（能力层热更新，人格不变）' : `档位没切成功：${r.error ?? ''}`, r.ok);
+        refresh();
+      }));
+    }
+    // 一行入口点开就是那份表单（原生 details 没有样式）
+    $('cx-toggle')?.addEventListener('click', () => {
+      const body = $('cx-body');
+      const open = body.hidden;
+      body.hidden = !open;
+      $('cx-toggle').setAttribute('aria-expanded', String(open));
+      $('cx-toggle').querySelector('.cx-caret').textContent = open ? '收起 ⌃' : '展开 ›';
+    });
+    $('go-wardrobe')?.addEventListener('click', () => mgShow('wardrobe'));
+    // 那个**没有入口的换装面板**（角色库/服装部件/穿搭档案）——它本来就该有这扇门
+    $('wd-open-panel')?.addEventListener('click', () => window.api.petOutfitOpen?.());
+    $('backup-btn').addEventListener('click', () => {
+      // 与「我的 TA → 把 TA 带走」一致：用户自设 6 位数字密码（输两次），
+      // 取代系统生成恢复密钥的旧流程（旧流程密钥只显示一次，极易丢失 = 包解不开）。
+      const mask = document.createElement('div');
+      mask.className = 'mask';
+      mask.innerHTML = `
+        <div class="modal card">
+          <div class="mo-t">导出可携带备份包</div>
+          <div class="mo-b">包里有出生信息、日志链与全部记忆。换电脑时用它 + 密码接回同一个 TA。</div>
+          <div class="mo-b" style="margin-top:10px">请设 <b>6 位数字</b>密码，输两次确认：</div>
+          <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
+            <input class="input" id="bk-p1" type="password" inputmode="numeric" maxlength="6" placeholder="6 位数字密码" autocomplete="off">
+            <input class="input" id="bk-p2" type="password" inputmode="numeric" maxlength="6" placeholder="再输一次" autocomplete="off">
+          </div>
+          <div class="mo-b" style="margin-top:10px;color:var(--danger)"><b>这个密码没有找回。</b>忘了它，TA 就真的回不来了。</div>
+          <div class="mo-b" id="bk-tip" style="min-height:18px;font-size:12.5px;margin-top:8px"></div>
+          <div class="mo-ops">
+            <button class="btn sm ghost" id="bk-cancel">关闭</button>
+            <button class="btn sm" id="bk-go">导出</button>
+          </div>
+        </div>`;
+      document.body.append(mask);
+      const close = () => mask.remove();
+      const tip = (t) => { mask.querySelector('#bk-tip').textContent = t; };
+      mask.addEventListener('click', (e) => { if (e.target === mask) close(); });
+      mask.querySelector('#bk-cancel').onclick = close;
+      mask.querySelector('#bk-go').onclick = async () => {
+        const p1 = mask.querySelector('#bk-p1').value.trim();
+        const p2 = mask.querySelector('#bk-p2').value.trim();
+        if (!/^\d{6}$/.test(p1)) return tip('请设 6 位数字密码');
+        if (p1 !== p2) return tip('两次输入不一致，再试一次');
+        const go = mask.querySelector('#bk-go');
+        go.disabled = true;
+        tip('导出中…');
+        const r = await window.api.backupExport(p1);
+        if (r.ok) {
+          close();
+          // 落在"会离开这台机器"的位置时如实说一句（点了头才走得到这里）
+          setResult('backup-result', `✅ 已导出：${r.path}（${r.entries} 条日志 / ${r.memories} 条记忆）——密码记牢，没有找回`
+            + (r.outOfMachine ? ` · 注意：它现在在「${r.where}」里，也就是说会离开这台机器` : ''), true);
+          return;
+        }
+        /* 落点在云盘/外接卷 → 宿主**一个字节都没写**，先回 needsConfirm。
+           这里把话说清再让他决定（硬拒会砍掉"备份到 iCloud"这种正当需求，悄悄放行更不行）。 */
+        if (r.needsConfirm) {
+          go.disabled = false;
+          tip('');
+          const ok = await confirmOutOfMachine(r);
+          if (ok) {
+            go.disabled = true;
+            tip('导出中…');
+            const r2 = await window.api.backupExport(p1, { path: r.path, confirmed: true });
+            if (r2.ok) {
+              close();
+              setResult('backup-result', `✅ 已导出：${r2.path}（${r2.entries} 条日志 / ${r2.memories} 条记忆）· 它现在在「${r2.where}」里，会离开这台机器`, true);
+            } else { go.disabled = false; tip('导出失败：' + (r2.error ?? '')); }
+          }
+          return;
+        }
+        go.disabled = false;
+        tip('导出失败：' + (r.error ?? ''));
+      };
+    });
+
+    /* 落点在外面时的确认框。文案三件事：在哪儿、意味着什么、还能改主意。
+       按钮层级：**"换一个位置"是主按钮**，"仍然导出"是描边（视觉不许把人往宽的那边推）。 */
+    function confirmOutOfMachine(r) {
+      return new Promise((resolve) => {
+        const mask = document.createElement('div');
+        mask.className = 'mask';
+        mask.innerHTML = `
+          <div class="modal card">
+            <div class="mo-t">这个位置会离开这台机器</div>
+            <div class="mo-b">你选的是<b id="oc-where"></b>里的位置。包一放进去，它就<b>不在这台机器上了</b>
+              ——同步、备份、被别人看到，都发生在你看不见的地方。</div>
+            <div class="mo-b" style="margin-top:10px">包里有出生信息、签名日志和全部记忆；密码仍然只有你知道（包是加密的）。</div>
+            <!-- 按钮层级：**"换一个位置"是主按钮**，"仍然导出"是描边——视觉不许把人往宽的那边推
+                 （同一条纪律用在审批卡的"以后这类都行"上） -->
+            <div class="mo-ops">
+              <button class="btn sm" id="oc-cancel">换一个位置</button>
+              <button class="btn sm ghost" id="oc-yes">仍然导出</button>
+            </div>
+          </div>`;
+        document.body.append(mask);
+        mask.querySelector('#oc-where').textContent = r.where ?? '云盘';
+        const done = (v) => { mask.remove(); resolve(v); };
+        mask.addEventListener('click', (e) => { if (e.target === mask) done(false); });
+        mask.querySelector('#oc-cancel').onclick = () => done(false);
+        mask.querySelector('#oc-yes').onclick = () => done(true);
+      });
+    }
+
+    // ---- 把这一段对话存成一页（给人看的；记忆包是给机器搬的） ----
+    // 落点由**系统"另存为"对话框**定（用户自己选、自己看见），所以这里不猜路径、也不碰云盘确认那一套。
+    $('chat-html-btn').addEventListener('click', async () => {
+      const r = await window.api.chatExportHtml().catch((e) => ({ ok: false, error: e?.message }));
+      if (r?.ok) { setResult('chat-html-result', `✅ 已存好：${r.path}（${r.count} 条）——双击就能打开`, true); return; }
+      if (r?.canceled) { setResult('chat-html-result', DT('manage.js.result.11', '没存：你取消了'), false); return; }
+      setResult('chat-html-result', DT('manage.js.result.12', '✗ 没存成：') + (r?.error ?? '未知原因'), false);
+    });
+
+    // ---- 语言（选完提示重启生效，不做热切换） ----
+    async function renderLang() {
+      const slot = $('lang-pick');
+      if (!slot) return;
+      const info = await window.api.i18nGet?.().catch(() => null);
+      // 语言以**宿主**为准（`info.pref`：空 = 跟随系统）；设置页的 prefs 里也有这个字段，但两处读会漂移
+      const cur = info?.pref ?? (prefs.language ?? '');
+      slot.replaceChildren(UI2.LocalePicker({
+        value: cur,
+        supported: info?.supported ?? ['zh-CN', 'zh-Hant', 'en', 'ja', 'ko'],
+        onChange: async (v) => {
+          const r = await window.api.prefSet?.('language', v).catch(() => null);
+          if (!r?.ok) { setResult('lang-result', DT('manage.js.result.13', '没改成：') + (r?.error ?? '未知原因'), false); return; }
+          prefs = r.prefs ?? prefs;
+          // 显示**语言名**，不是代码（用户可见文案里不出现技术字段）
+          const NAMES = { 'zh-CN': '简体中文', 'zh-Hant': '繁體中文', en: 'English', ja: '日本語', ko: '한국어' };
+          setResult('lang-result', v ? `选好了：${NAMES[v] ?? v} —— 重启灵核之后界面就是那个语言` : '选好了：跟随系统语言 —— 重启灵核之后生效', true);
+        },
+      }));
+    }
+
+    // ---- 后台复盘开关（默认关；打开后每 10 轮一次） ----
+    {
+      const show = (r) => {
+        if (!r?.ok) return;
+        swState($('review-toggle'), !!r.enabled);
+        const last = r.last;
+        setResult('review-result', last
+          ? `上一次：${last.ok ? '跑完了' : '没跑完'}，提了 ${last.candidates} 条候选${last.error ? `（${last.error}）` : ''}`
+          : (r.enabled ? '还没到第一次复盘（每 10 轮一次）' : ''), true);
+      };
+      window.api.reviewGet?.().then(show).catch(() => null);
+      $('review-toggle').onclick = async () => {
+        const next = $('review-toggle').classList.contains('off');   // 点之前是 off → 这次是打开
+        const r = await window.api.reviewSet?.(next).catch(() => null);
+        if (!r?.ok) { setResult('review-result', DT('manage.js.result.14', '没改成：') + (r?.error ?? '未知原因'), false); return; }
+        swState($('review-toggle'), !!r.enabled);
+        setResult('review-result', r.enabled ? '打开了：从这一轮开始数，满 10 轮她复盘一次' : '关掉了', true);
+      };
+    }
+
+    // ---- 「接回 TA」——选包 + 输密码（不走账号、不联网） ----
+    // 内核 importPortablePackage 与 IPC portable-import 一直都有，缺的是 preload 与界面；
+    // 未绑定态也要能走这条路。
+    $('restore-btn').addEventListener('click', async () => {
+      const pick = await window.api.backupPick().catch(() => null);
+      if (!pick?.ok) { if (pick?.error && pick.error !== '未选择文件') setResult('restore-result', '✗ ' + pick.error, false); return; }
+      const mask = document.createElement('div');
+      mask.className = 'mask';
+      // 文件名走 textContent 注入，**不拼进 innerHTML** —— 文件名是用户可控的
+      // （选中一个叫 `<img src=x onerror=...>.lhpack` 的文件就会执行），
+      // 渲染纪律是"先转义再变换"（安全不回退）。
+      mask.innerHTML = `
+        <div class="modal card">
+          <div class="mo-t">接回 TA</div>
+          <div class="mo-b">已选：<b id="rs-file"></b></div>
+          <div class="mo-b" style="margin-top:10px">输入当初导出时设的 <b>6 位数字</b>密码：</div>
+          <input class="input" id="rs-p1" type="password" inputmode="numeric" maxlength="6" placeholder="6 位数字密码" autocomplete="off" style="margin-top:10px">
+          <div class="mo-b" id="rs-tip" style="min-height:18px;font-size:12.5px;margin-top:8px"></div>
+          <div class="mo-ops">
+            <button class="btn sm ghost" id="rs-cancel">关闭</button>
+            <button class="btn sm" id="rs-go">接回来</button>
+          </div>
+        </div>`;
+      document.body.appendChild(mask);
+      mask.querySelector('#rs-file').textContent = String(pick.path).split('/').pop();
+      const close = () => mask.remove();
+      mask.addEventListener('click', (e) => { if (e.target === mask) close(); });
+      const inp = mask.querySelector('#rs-p1');
+      const tip = (t) => { mask.querySelector('#rs-tip').textContent = t ?? ''; };
+      setTimeout(() => inp.focus(), 50);
+      const go = mask.querySelector('#rs-go');
+      const run = async () => {
+        const p = inp.value.trim();
+        if (p.length < 6) { tip('密码至少 6 位'); return; }
+        go.disabled = true;
+        tip('正在解开…');   // KDF 那一下约 1 秒，别让用户以为卡死
+        const r = await window.api.backupImport(pick.path, p).catch(() => null);
+        if (r?.ok) {
+          close();
+          setResult('restore-result', `✅ 已接回（${r.entries ?? 0} 条日志 / ${r.memories ?? 0} 条记忆）——重开灵核就能见到她`, true);
+        } else { go.disabled = false; tip(r?.error || '接回失败，请再试一次'); }
+      };
+      mask.querySelector('#rs-go').addEventListener('click', run);
+      mask.querySelector('#rs-cancel').addEventListener('click', close);
+      inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); });
+    });
+
+    // ---- 自定义大脑（测试连通 → 保存 → 切换为大脑） ----
+    const cx = { name: $('cx-name'), url: $('cx-url'), key: $('cx-key'), model: $('cx-model') };
+    let cxSaved = false;
+    $('cx-test').addEventListener('click', async () => {
+      setResult('cx-result', DT('manage.js.result.15', '测试中…（最多 15 秒）'));
+      const r = await window.api.llmTestProvider({ name: cx.name.value.trim() || 'test', baseUrl: cx.url.value.trim(), apiKey: cx.key.value.trim(), model: cx.model.value.trim() });
+      setResult('cx-result', r.connected ? `✅ 连通正常：${r.note ?? ''}` : `✗ 连不通：${r.error ?? ''}`, r.connected);
+    });
+    $('cx-save').addEventListener('click', async () => {
+      const r = await window.api.llmCustomSet({ name: cx.name.value.trim(), baseUrl: cx.url.value.trim(), apiKey: cx.key.value.trim(), model: cx.model.value.trim() });
+      if (r.ok) {
+        cxSaved = true;
+        $('cx-use').style.display = '';
+        setResult('cx-result', DT('manage.js.result.16', '✅ 已保存——可先测试连通，确认后切换为大脑'));
+      } else setResult('cx-result', DT('manage.js.result.17', '保存失败：') + (r.error ?? ''), false);
+    });
+    $('cx-use').addEventListener('click', async () => {
+      const r = await window.api.llmSetProvider(cx.name.value.trim());
+      setResult('cx-result', r.ok ? `✅ 已切换大脑 → ${r.provider}（下次对话生效；人格不变）` : '切换失败：' + (r.error ?? ''), r.ok);
+      cxSaved = false;
+      $('cx-use').style.display = 'none';
+      refresh();
+    });
+
+    // ---- 技能安装 / MCP 安装 ----
+    $('skill-install-btn').addEventListener('click', async () => {
+      const src = $('skill-src').value.trim();
+      if (!src) { setResult('st-result', DT('manage.js.result.18', '请输入技能来源（owner/repo 或直链）'), false); return; }
+      setResult('st-result', DT('manage.js.result.19', '安装中…'));
+      const r = await window.api.skillInstall(src);
+      setResult('st-result', r.ok ? `✅ 技能「${r.name}」已安装，立即可用` : '安装失败：' + (r.error ?? ''), r.ok);
+      if (r.ok) { $('skill-src').value = ''; renderST(); }
+    });
+    $('mcp-install-btn').addEventListener('click', async () => {
+      const name = $('mcp-name').value.trim();
+      const url = $('mcp-url').value.trim();
+      if (!name || !url) { setResult('st-result', DT('manage.js.result.20', '请输入名称和 MCP 地址'), false); return; }
+      setResult('st-result', DT('manage.js.result.21', '连通测试中…（最多 15 秒）'));
+      const r = await window.api.mcpInstall(name, url);
+      setResult('st-result', r.ok ? `✅ ${r.note ?? '已安装'}（发现 ${r.tools} 个工具）` : '安装失败：' + (r.error ?? ''), r.ok);
+      if (r.ok) { $('mcp-name').value = ''; $('mcp-url').value = ''; renderST(); }
+    });
+
+    // ---- 出生引导（未绑定态） ----
+    $('import-btn').addEventListener('click', async () => {
+      setResult('birth-result', DT('manage.js.result.22', '选择出生包…'));
+      const r = await window.api.importPackage();
+      if (r?.ok) {
+        birthPkg = r;
+        $('pkg-summary').classList.add('show');
+        $('pkg-id').textContent = r.application_id ?? '—';
+        const sel = r.selections ?? {};
+        $('pkg-meta').textContent = [sel.gender === 'male' ? '男' : sel.gender === 'female' ? '女' : '', sel.birth_age_tier != null ? `出生档 ${sel.birth_age_tier}` : ''].filter(Boolean).join(' · ') || '已就绪';
+        $('birth-btn').hidden = false;
+        setResult('birth-result', DT('manage.js.result.23', '✅ 出生包已就绪——点击下方按钮，TA 就会出生'));
+      } else setResult('birth-result', DT('manage.js.result.24', '导入失败：') + (r?.error ?? ''), false);
+    });
+    $('birth-btn').addEventListener('click', async () => {
+      const r = await window.api.bind();
+      if (r?.ok) {
+        setResult('birth-result', DT('manage.js.result.25', '✨ TA 出生了！正在现身到你的桌面…'));
+        setTimeout(refresh, 1500);
+      } else setResult('birth-result', DT('manage.js.result.26', '出生失败：') + (r?.error ?? ''), false);
+    });
+
+    speechSynthesis.onvoiceschanged = renderPrefs;
+    // 开关的"说真话"渲染：.sw 是产品自带开关（开=渐变+滑块靠右，关=.off）
+    function swState(el, on) { if (!el) return; el.classList.toggle('off', !on); el.setAttribute('aria-checked', on ? 'true' : 'false'); }
+    refresh();
+  
+    // ---------- 左导航 / 分页 / 搜索 / 返回应用 ----------
+    // 类名与本页 CSS 一一对应。
+    const MG_ICON = {
+      general: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.6v.2"/></svg>',
+      look: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3.6 8.6 5.4 5 7.2l1.6 3.4 1.2-.6v8h8.4v-8l1.2.6L19 7.2 15.4 5.4z"/></svg>',
+      voice: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3l4-3.5v12l-4-3.5H4z"/><path d="M15.5 9a4 4 0 0 1 0 6"/></svg>',
+      relation: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.4-7-9.3A4.2 4.2 0 0 1 12 7a4.2 4.2 0 0 1 7 3.7c0 4.9-7 9.3-7 9.3Z"/></svg>',
+      ability: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3.2 13.7 9.5 20 12l-6.3 2.5L12 20.8 10.3 14.5 4 12l6.3-2.5Z"/></svg>',
+      market: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h16l-1.2 10.2a1.6 1.6 0 0 1-1.6 1.4H6.8a1.6 1.6 0 0 1-1.6-1.4Z"/><path d="M8.4 9V6.6a3.6 3.6 0 0 1 7.2 0V9"/></svg>',
+      skills: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><path d="M17 14v6M14 17h6"/></svg>',
+      company: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 8h12v9H4z"/><path d="M16 11h3l1 3v3h-4"/><circle cx="7.5" cy="19" r="1.4"/><circle cx="15.5" cy="19" r="1.4"/></svg>',
+      model: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17M3.5 12h17"/></svg>',
+      data: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3.5 19 6v6c0 4.3-3 7.3-7 8.5-4-1.2-7-4.2-7-8.5V6z"/></svg>',
+      rules: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4.5h14v15H5z"/><path d="M8.5 9h7M8.5 12.5h7M8.5 16h4"/></svg>',
+    };
+    /* ⚠ 分组名与页名**都走词表**。
+       键名 = `manage.grp.<n>` / `manage.nav.<页 id>`；中文原文留在词表里，别在这儿写死。 */
+    const MG_PAGES = [
+      { g: 'manage.grp.1', items: [['general', 'manage.nav.general'], ['look', 'manage.nav.look'], ['wardrobe', 'manage.nav.wardrobe'], ['voice', 'manage.nav.voice'], ['relation', 'manage.nav.relation']] },
+      { g: 'manage.grp.2', items: [['ability', 'manage.nav.ability'], ['skills', 'manage.nav.skills'], ['market', 'manage.nav.market'], ['files', 'manage.nav.files'], ['company', 'manage.nav.company']] },
+      { g: 'manage.grp.3', items: [['model', 'manage.nav.model']] },
+      { g: 'manage.grp.4', items: [['rules', 'manage.nav.rules'], ['data', 'manage.nav.data']] },
+    ];
+    function mgShow(id) {
+      document.querySelectorAll('.mg-page').forEach((p) => p.classList.toggle('on', p.dataset.page === id));
+      if (id === 'files') renderFiles();       // 每次进这一页都重读（她可能刚经手过新文件）
+      if (id === 'data') { renderScreen(); renderOrigins(); }   // 她看过屏幕 / 最近几轮是谁说的
+      if (id === 'rules') renderMyRules();     // 同上：她可能刚记下一条规矩
+      if (id === 'general') renderWaitTone();  // 等待语那三套
+      if (id === 'market') renderMarket();     // 市场：每次都重读清单（源可能刚加）
+      if (id === 'wardrobe') renderWardrobe();  // 衣柜同理（她可能刚收到一件）
+      document.querySelectorAll('.mg-item').forEach((b) => b.setAttribute('aria-current', String(b.dataset.p === id)));
+      document.querySelector('.mg-body').scrollTop = 0;
+      try { localStorage.setItem('managePage', id); } catch { /* 存不上就默认常规 */ }
+    }
+    /* ⚠ 两层注意：
+       ① 必须用 `T(...)`（i18n.js 挂的是 `window.T`），写成小写 `t(...)` 会抛 ReferenceError
+          → **整个侧边栏一条都渲染不出来**，而且只在控制台报错。
+       ② **词表是异步到的**（`I18N.ready`），而这段是首屏同步跑的
+          → 键名会一直挂在界面上（`manage.nav.general`）。所以抽成函数，词表到了再刷一遍。 */
+    const renderMgNav = () => {
+      $('mg-nav').innerHTML = MG_PAGES.map((g) => `<div class="mg-grp">${T(g.g)}</div>`
+        + g.items.map(([id, key]) => `<div class="mg-item" data-p="${id}"><span class="ic">${MG_ICON[id] ?? ''}</span>${T(key)}</div>`).join('')).join('');
+      document.querySelectorAll('.mg-item').forEach((b) => { b.onclick = () => mgShow(b.dataset.p); });
+    };
+    renderMgNav();
+    window.I18N?.ready?.finally?.(renderMgNav);   // 词表到货后重刷（首屏那几毫秒可能是键名）
+    $('mg-q').addEventListener('input', (e) => {
+      const q = e.target.value.trim();
+      document.querySelectorAll('.mg-item').forEach((b) => { b.style.display = (!q || b.textContent.includes(q)) ? '' : 'none'; });
+    });
+    $('mg-back').onclick = () => window.close();     // 关掉管理中心 = 回到桌面上的她
+    $('mg-open-mem')?.addEventListener('click', () => window.api.meOpen?.('memory'));
+    $('voice-preview')?.addEventListener('click', () => {
+      window.api.birthSpeak?.(`你好，我是${$('tb-name')?.textContent || 'TA'}。`, 'joy');
+    });
+    // 数据页的两个数字 + 声音页说真话
+    window.api.status().then((s) => {
+      if (!s?.ok) return;
+      const mem = $('mg-mem'); if (mem) mem.textContent = `${s.memories ?? '—'} 条`;
+      const en = $('mg-entries'); if (en) en.textContent = s.integrity?.ok ? `${s.entries ?? '—'} 条 ✓` : '⚠';
+      const t = $('voice-truth');
+      if (t) {
+        t.innerHTML = s.ttsKey
+          ? '音色按上面选的走；云音色要联网，本机音色不联网也能出声。'
+          : '⚠ <b>云音色（更自然的那种）需要一把 DashScope 钥匙，这台机器上还没有</b> —— '
+            + '所以现在实际用的是<b>本机音色</b>，可能和你上面选的不一样。本机音色一直可用。';
+        t.className = s.ttsKey ? 'mg-note' : 'mg-note warn';
+      }
+    }).catch(() => { /* 拿不到状态就不显示那两块 */ });
+    // ---------- 销毁本机智能体（**各小项折叠选择**）----------
+    /* 设计纪律（改之前先读）：
+       ① **先给账单再问确认**：在一起多少天、每一大类里有什么、每样有多少 —— 不吓人，也不含糊；
+       ② **大类可展开、小项单独勾**；
+       ③ **大类勾选框三态**：勾一半时父级是一道横杠 —— 比"整组一起勾"更不容易误删；
+       ④ **没有警告块、没有底部提示句**：代价改由文案与按钮说清 ——
+          勾了「出生信息/身份钥匙」= 下次打开从头开始（重新选形象），按钮与回执都照这个说；
+       ⑤ **先导出记忆包**这条后悔药一直在旁边；⑥ 只有列表滚动，标题与按钮始终看得见。 */
+    /* `DT` 在 `i18n.js`（一处实现各页共用）——这里不再自带一份 */
+    const DT = window.DT;
+    $('destroy-btn')?.addEventListener('click', async () => {
+      const fp = await window.api.agentFootprint?.().catch(() => null);
+      if (!fp?.ok || !fp.bound) { setResult('destroy-result', fp?.error ?? '这台机器上还没有她', false); return; }
+      const groups = fp.groups ?? [];
+      const keyOf = (gid, sid) => (sid ? `${gid}:${sid}` : `${gid}:`);
+      const keysOf = (g) => (g.subs?.length ? g.subs.map((x) => keyOf(g.id, x.id)) : [keyOf(g.id)]);
+      const allKeys = () => groups.flatMap(keysOf);
+      const picked = new Set(allKeys());      // 默认全选（要销毁才点进来）
+      const open = new Set();                 // 默认收起：先看清有哪几大类，要单独挑再展开
+
+      const mask = document.createElement('div');
+      mask.className = 'mask';
+      mask.innerHTML = `
+        <div class="modal card dz">
+          <div class="dz-h">
+            <div class="dz-t">${DT('manage.destroy.v2.title', '销毁这台机器上的 TA')}</div>
+            <div class="dz-s">${fp.days !== null && fp.days !== undefined
+              ? DT('manage.destroy.v2.sub', '你们在一起 <b>{days}</b> 天了。下面每一项都可以单独选——想全清就全选，想只清一部分就只勾那几项。', { days: fp.days })
+              : DT('manage.destroy.v2.sub.nodays', '下面每一项都可以单独选——想全清就全选，想只清一部分就只勾那几项。')}</div>
+          </div>
+          <div class="dz-bar">
+            <span class="dz-all on" id="dz-all"><span class="dz-cb"></span>${DT('manage.destroy.v2.all', '全选')}</span>
+            <span class="dz-sp">
+              <span class="dz-fold" id="dz-fold"></span>
+              <span class="dz-n" id="dz-n"></span>
+            </span>
+          </div>
+          <div class="dz-list" id="dz-list"></div>
+          <div class="dz-f">
+            <button class="btn sm ghost" id="dz-cancel">${DT('manage.destroy.v2.cancel', '先不销毁')}</button>
+            <span class="dz-sp">
+              <button class="btn sm ghost" id="dz-export">${DT('manage.destroy.v2.export', '先导出记忆包')}</button>
+              <button class="btn sm danger" id="dz-go">${DT('manage.destroy.v2.go.all', '全部销毁')}</button>
+            </span>
+          </div>
+        </div>`;
+      document.body.append(mask);
+
+      const list = mask.querySelector('#dz-list');
+      const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
+      const render = () => {
+        list.innerHTML = '';
+        for (const g of groups) {
+          const ks = keysOf(g);
+          const on = ks.filter((k) => picked.has(k)).length;
+          const box = el('div', 'dz-g' + (on === ks.length ? ' on' : on > 0 ? ' half' : ''));
+          const head = el('div', 'dz-g-h');
+          const caret = el('span', 'dz-caret' + (!g.subs?.length ? ' leaf' : open.has(g.id) ? ' open' : ''), '›');
+          const cb = el('span', 'dz-cb');
+          cb.onclick = (e) => { e.stopPropagation(); toggleGroup(ks); render(); };
+          const tx = el('span', 'dz-tx');
+          tx.append(el('span', 'dz-t2', esc(g.label)), el('span', 'dz-d', esc(g.desc ?? '')));
+          head.append(caret, cb, tx, el('span', 'dz-sz', esc(g.size ?? '')));
+          head.onclick = () => {
+            if (!g.subs?.length) { toggleGroup(ks); render(); return; }   // 没有小项（花销）：整行就是勾选
+            open.has(g.id) ? open.delete(g.id) : open.add(g.id);          // 有小项：点行 = 展开/收起
+            render();
+          };
+          box.append(head);
+          if (g.subs?.length && open.has(g.id)) {
+            const subs = el('div', 'dz-subs open');
+            for (const x of g.subs) {
+              const k = keyOf(g.id, x.id);
+              const row = el('div', 'dz-sub' + (picked.has(k) ? ' on' : ''));
+              row.append(el('span', 'dz-cb'), el('span', 'dz-st', esc(x.label)));
+              if (x.desc) row.append(el('span', 'dz-sd', esc(x.desc)));
+              if (x.size) row.append(el('span', 'dz-ss', esc(x.size)));
+              row.onclick = () => { picked.has(k) ? picked.delete(k) : picked.add(k); render(); };
+              subs.append(row);
+            }
+            box.append(subs);
+          }
+          list.append(box);
+        }
+        // 工具条与主按钮实时汇总（"全部销毁" / "销毁选中的 N 项"）
+        const n = picked.size;
+        const total = allKeys().length;
+        const allEl = mask.querySelector('#dz-all');
+        allEl.classList.toggle('on', n > 0 && n === total);
+        allEl.classList.toggle('half', n > 0 && n < total);
+        mask.querySelector('#dz-n').textContent = n === total
+          ? DT('manage.destroy.v2.count.all', '全部 {n} 项', { n: total })
+          : DT('manage.destroy.v2.count.some', '已选 {n} / {total} 项', { n, total });
+        mask.querySelector('#dz-fold').textContent = open.size
+          ? DT('manage.destroy.v2.collapse', '全部收起')
+          : DT('manage.destroy.v2.expand', '全部展开');
+        const go = mask.querySelector('#dz-go');
+        go.textContent = n === total ? DT('manage.destroy.v2.go.all', '全部销毁')
+                                     : DT('manage.destroy.v2.go.some', '销毁选中的 {n} 项', { n });
+        go.disabled = n === 0;
+      };
+      const toggleGroup = (ks) => {
+        const allOn = ks.every((k) => picked.has(k));
+        for (const k of ks) allOn ? picked.delete(k) : picked.add(k);
+      };
+      // 小项 → 真实的东西由主进程按小项 id 落（runtime/lib.mjs 的 GROUPS），这里只报"选了哪些"
+      const selection = () => {
+        const out = {};
+        for (const g of groups) {
+          const ks = keysOf(g).filter((k) => picked.has(k));
+          if (!ks.length) continue;
+          out[g.id] = g.subs?.length ? ks.map((k) => k.split(':')[1]) : true;
+        }
+        return out;
+      };
+      const close = () => mask.remove();
+      mask.querySelector('#dz-all').onclick = () => {
+        const ks = allKeys();
+        const allOn = ks.every((k) => picked.has(k));
+        picked.clear();
+        if (!allOn) for (const k of ks) picked.add(k);
+        render();
+      };
+      mask.querySelector('#dz-fold').onclick = () => {
+        if (open.size) open.clear();
+        else for (const g of groups) if (g.subs?.length) open.add(g.id);
+        render();
+      };
+      mask.addEventListener('click', (e) => { if (e.target === mask) close(); });
+      mask.querySelector('#dz-cancel').onclick = close;
+      mask.querySelector('#dz-export').onclick = () => { close(); $('backup-btn')?.click(); };  // 后悔药就在隔壁
+      mask.querySelector('#dz-go').onclick = async () => {
+        const go = mask.querySelector('#dz-go');
+        go.disabled = true;
+        go.textContent = DT('manage.destroy.v2.working', '正在销毁…');
+        const r = await window.api.agentDestroy?.('destroy', selection());
+        if (!r?.ok) {
+          go.disabled = false;
+          render();
+          setResult('destroy-result', DT('manage.destroy.v2.fail', '没销毁成功：{msg}', { msg: r?.error ?? '' }), false);
+          return;
+        }
+        // 如实回执：删了什么 / 留了什么（不回"已重置"这种含糊话）
+        mask.querySelector('.dz-t').textContent = DT('manage.destroy.v2.done.t', '已经销毁了');
+        mask.querySelector('.dz-s').innerHTML = r.reborn
+          ? DT('manage.destroy.v2.done.reborn', '这台机器上现在是一个全新的她。正在重新开始…')
+          : DT('manage.destroy.v2.done.keep', '被勾的内容已经删掉，她本人还在。');
+        list.innerHTML = `<div class="dz-g-h dz-receipt"><span class="dz-tx">`
+          + `<span class="dz-d">${DT('manage.destroy.v2.removed', '删掉了：{list}', { list: (r.removed ?? []).map(esc).join('、') || DT('manage.destroy.v2.nothing', '（本来就没有）') })}</span>`
+          + `<span class="dz-d">${DT('manage.destroy.v2.kept', '留着的：{list}', { list: (r.kept ?? []).map(esc).join('、') })}</span></span></div>`;
+        mask.querySelector('.dz-bar').style.display = 'none';
+        mask.querySelector('#dz-export').style.display = 'none';
+        go.style.display = 'none';
+        setResult('destroy-result', r.reborn
+          ? DT('manage.destroy.v2.result.reborn', '已销毁。下次打开灵核会从出生向导开始（形象也要重新选）。')
+          : DT('manage.destroy.v2.result.keep', '已按你勾的销毁。她还是她，只是那些内容没有了。'), true);
+        // 勾了身份 → 干净重启（没有出生包 → 应用自己打开出生向导）；只清内容 → 不用重启
+        if (r.reborn) setTimeout(() => { window.api.appRestart?.(); }, 1200);
+        else mask.querySelector('#dz-cancel').textContent = DT('manage.destroy.v2.done', '知道了');
+      };
+      render();
+    });
+
+    // ---------- 她等你的时候说什么 ----------
+    /* 三套词在 `ui/state-words.js`（唯一真源）；这里只做"选哪套 + 先看再选"。
+       预览走宿主的 `wait-tone-preview`（用真词表取，不在界面里另抄一份文案）。 */
+    const TONE_WORD = { gentle: '温柔', crisp: '干脆', playful: '俏皮', '': '通用' };
+    const STATE_WORD = { Listening: '她在想的时候', Working: '她正在做的时候', Approval: '她等你点头的时候' };
+    async function renderWaitTone() {
+      const box = $('tone-grid'); if (!box) return;
+      const cur = (await window.api.waitTone?.().catch(() => null))?.tone ?? '';
+      const pv = await window.api.waitTonePreview?.().catch(() => null);
+      box.innerHTML = ['gentle', 'crisp', 'playful'].map((t) => `
+        <button class="tone-opt${t === cur ? ' on' : ''}" data-tone="${t}">
+          <span class="tt">${TONE_WORD[t]}</span>
+          <span class="td" data-tone-demo="${t}"></span>
+        </button>`).join('');
+      /* 每套下面那句示范：**从真词表里取**（`TaskWords.pendingWords`，与跑起来用的是同一份），
+         不在界面里另抄一遍文案——抄一份就是"第二张表"的开始。 */
+      const demo = {};
+      for (const t of ['gentle', 'crisp', 'playful']) {
+        demo[t] = globalThis.TaskWords?.pendingWords?.('Working', t) ?? '';
+      }
+      box.querySelectorAll('[data-tone-demo]').forEach((el) => { el.textContent = demo[el.dataset.toneDemo] ?? ''; });
+      $('tone-preview').textContent = pv?.ok
+        ? `现在用的是「${TONE_WORD[pv.tone ?? '']}」：${Object.entries(pv.preview ?? {}).map(([k, v]) => `${STATE_WORD[k] ?? k}「${v}」`).join(' · ')}`
+        : '';
+      box.querySelectorAll('[data-tone]').forEach((b) => {
+        b.onclick = async () => {
+          const r = await window.api.waitToneSet?.(b.dataset.tone).catch(() => null);
+          if (r?.ok) { renderWaitTone(); setResult('save-status', `好，她等你的时候改用「${TONE_WORD[r.tone ?? '']}」那套说法。`, true); }
+        };
+      });
+    }
+
+    // ---------- 这一轮是谁说的 ----------
+    /* 只读签名链（来源本来就记在那儿），翻成人话；数字不做二次统计——**
+       两处数字迟早不一致**这条纪律在这里同样适用。 */
+    async function renderOrigins() {
+      const r = await window.api.turnOrigins?.(8).catch(() => null);
+      if (!r?.ok) { $('og-t').textContent = DT('manage.fail.log', '暂时读不到记录'); return r; }
+      $('og-t').textContent = r.total
+        ? `最近 ${r.total} 轮里，${r.mine} 轮是你说的`
+        : '还没有可看的轮次';
+      $('og-list').innerHTML = (r.turns ?? []).map((t) => `
+        <div class="mg-row"><div class="tx"><div class="t">${esc(t.word)}</div>
+          <div class="d">${t.at ? esc(hhmm(t.at)) : ''}</div></div><div class="ctl"></div></div>`).join('');
+      return r;
+    }
+    $('og-recent')?.addEventListener('click', async () => {
+      const box = $('og-list');
+      const show = box.style.display === 'none';
+      box.style.display = show ? '' : 'none';
+      $('og-recent').textContent = show ? DT('manage.origins.hide', '收起') : DT('manage.origins.show', '看最近几轮');
+      if (show) await renderOrigins();
+    });
+
+    // ---------- 她看过什么 ----------
+    /* 数字**全部来自签名链**（`screenUsage` 读 `screen_capture` 那几条），不另存计数——
+       两处数字迟早不一致。时间一律人话（"今天 15:04"），不出现时间戳。 */
+    function hhmm(ts) {
+      if (!ts) return '';
+      const d = new Date(Number(ts));
+      const now = new Date();
+      const sameDay = d.toDateString() === now.toDateString();
+      const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      if (sameDay) return `今天 ${hm}`;
+      const y = new Date(now.getTime() - 86400000);
+      if (d.toDateString() === y.toDateString()) return `昨天 ${hm}`;
+      return `${d.getMonth() + 1} 月 ${d.getDate()} 日 ${hm}`;
+    }
+    const SRC_WORD = { button: '你按的「看一眼」', watch: '定时观察' };
+    async function renderScreen() {
+      const r = await window.api.screenUsage?.().catch(() => null);
+      if (!r?.ok) { $('scr-t').textContent = DT('manage.fail.log', '暂时读不到记录'); return; }
+      const n = Number(r.count ?? 0);
+      $('scr-t').textContent = n === 0 ? DT('manage.screen.count.none', '还没看过屏幕') : DT('manage.screen.count.some', '一共看过 {n} 次屏幕').replace('{n}', String(n));
+      const bits = [];
+      if (r.lastAt) bits.push(`${DT('manage.screen.last', '最近一次')}：${hhmm(r.lastAt)}${r.lastSource ? `（${SRC_WORD[r.lastSource] ?? ''}）` : ''}`);
+      if (Number(r.denied ?? 0) > 0) bits.push(DT('manage.screen.denied', '被拦下 {n} 次').replace('{n}', String(r.denied)));
+      $('scr-d').textContent = bits.length ? bits.join(' · ') : DT('manage.screen.count.d', '她要看屏幕时，每一次都会记进签名链——这里读的就是那些记录。');
+      const w = $('scr-watch');
+      w.textContent = r.watch ? DT('manage.screen.watch.on', '开着') : DT('manage.screen.watch.off', '关着');
+      $('scr-watch-btn').textContent = r.watch ? DT('manage.screen.watch.close', '关掉') : DT('manage.screen.watch.open', '打开');
+      const list = $('scr-list');
+      list.innerHTML = (r.recent ?? []).map((x) => `
+        <div class="mg-row"><div class="tx"><div class="t">${esc(hhmm(x.at))}</div>
+          <div class="d">${esc(SRC_WORD[x.source] ?? '')}</div></div><div class="ctl"></div></div>`).join('');
+      return r;
+    }
+    $('scr-recent')?.addEventListener('click', async () => {
+      const box = $('scr-list');
+      const show = box.style.display === 'none';
+      box.style.display = show ? '' : 'none';
+      $('scr-recent').textContent = show ? DT('manage.screen.hide', '收起') : DT('manage.screen.show', '看记录');
+      if (show) await renderScreen();
+    });
+    $('scr-watch-btn')?.addEventListener('click', async () => {
+      const r = await window.api.petScreenToggle?.().catch(() => null);
+      await renderScreen();
+      setResult('screen-result', r?.active
+        ? DT('manage.screen.watch.on.msg', '好，我盯着点——每 45 秒看一眼，每次都记一笔，你随时能关。')
+        : DT('manage.screen.watch.off.msg', '好，不看了。'), true);
+    });
+
+    $('go-market')?.addEventListener('click', () => mgShow('market'));
+
+    // ---------- 市场：源 + 目录 + 装之前说清 ----------
+    /* 三条纪律落在这里：
+       ① 第三方一律标来源与"未审核"（`thirdParty`）；
+       ② 取不到的源**带着错因显示**（"这个源这次没取到：超时"）——**绝不显示空市场**；
+       ③ 卡片上的"装"先出一屏说明（`mkExplain`），说清"带来什么 / 不能碰什么 / 来源"再装。 */
+    let mkCatalog = null;
+    let mkSources = [];
+    const KIND_WORD = { skill: '技', mcp: '服' };
+    function mkCard(it, sourceLabel, builtin) {
+      const installed = it.installed;
+      return `<div class="mk-card">
+        <div class="mk-h"><span class="mk-kind k-${esc(it.kind)}">${KIND_WORD[it.kind] ?? '·'}</span><b>${esc(it.name)}</b></div>
+        <div class="mk-d">${esc(it.summary ?? '')}</div>
+        <div class="mk-s">来自 ${esc(it.repo ?? it.dir ?? sourceLabel ?? '')}${it.thirdParty === false ? '' : ' · <b>第三方，未审核</b>'}${it.license ? ` · 授权：${esc(it.license)}` : ''}</div>
+        <div class="mk-ops">${installed
+          ? `<span class="mg-val">已装</span><button class="mg-btn" data-mk-manage="1">去管理</button>`
+          : `<button class="mg-btn pri" data-mk-install="${esc(it.name)}">装</button>`}
+          ${it.url || it.dir ? `<button class="mg-btn" data-mk-read="${esc(it.name)}">看原文</button>` : ''}</div>
+      </div>`;
+    }
+    async function renderMarket() {
+      const body = $('mk-body'); if (!body) return;
+      const r = await window.api.marketCatalog?.().catch(() => null);
+      mkSources = (await window.api.marketSources?.().catch(() => null))?.sources ?? mkSources;
+      if (!r?.ok) { body.textContent = '读不到清单，重开这个窗口试试。'; return; }
+      mkCatalog = r;
+      const q = ($('mk-search')?.value ?? '').trim().toLowerCase();
+      let items = 0, html = '';
+      for (const g of r.sources) {
+        const list = (g.items ?? []).filter((x) => !q || `${x.name} ${x.summary ?? ''}`.toLowerCase().includes(q));
+        items += list.length;
+        if (!g.ok) {
+          // ③ 取不到就如实说：源还在，只是这次没取到（不显示成"东西都没了"）
+          html += `<div class="mk-src-err">⚠ 「${esc(g.label)}」这个清单这次没取到：<b>${esc(g.error ?? '')}</b>
+            <span class="mk-s">（源还在，只是这次没取到；点"刷新"再试一次）</span></div>`;
+          continue;
+        }
+        if (!list.length) continue;
+        html += `<div class="mk-grp">${esc(g.label)}${g.builtin ? ' · 随包附的' : ''} <span class="mk-s">${list.length} 项</span></div>`
+          + `<div class="mk-grid">${list.map((x) => mkCard(x, g.label, g.builtin)).join('')}</div>`;
+      }
+      body.innerHTML = html || '<span style="color:var(--ink-faint)">这个源里没有能装的东西</span>';
+      $('mk-count').textContent = `技能与外部服务 ${items} 项 · 源 ${r.sources.filter((g) => g.ok).length}/${r.sources.length} 个正常`;
+      renderMarketSources();
+      bindMarket();
+      renderInstalled();
+    }
+    function renderMarketSources() {
+      const box = $('mk-sources'); if (!box) return;
+      box.innerHTML = mkSources.map((s) => `
+        <div class="mg-row"><div class="tx">
+          <div class="t">${esc(s.label ?? s.locator)}${s.builtin ? ' <span class="mg-val">随包附的</span>' : ''}</div>
+          <div class="d" style="word-break:break-all">${esc(s.locator)}${s.count ? ` · ${s.count} 项` : ''}${s.lastCheckedAt ? ` · 上次检查 ${hhmm(s.lastCheckedAt)}` : ''}${s.lastError ? ` · <b>上次没取到：${esc(s.lastError)}</b>` : ''}</div>
+        </div><div class="ctl">
+          <button class="mg-btn" data-mk-refresh="${esc(s.id)}">刷新</button>
+          ${s.builtin ? '' : `<button class="mg-btn" data-mk-rm="${esc(s.id)}">删掉</button>`}
+        </div></div>`).join('') + `
+        <div class="mg-row" style="display:block">
+          <div class="d" style="margin-bottom:6px">加一个源（三种都行；<b>加之前会先取一次，取不到就不加</b>）</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <input class="input" id="mk-add-repo" placeholder="GitHub 仓库：owner/repo" style="flex:1;min-width:170px">
+            <input class="input" id="mk-add-url" placeholder="清单地址：https://…/market.json" style="flex:1;min-width:200px">
+            <input class="input" id="mk-add-dir" placeholder="本地文件夹：~/我的技能" style="flex:1;min-width:170px">
+            <button class="mg-btn pri" id="mk-add-go">加上</button>
+          </div>
+          <div class="result" id="mk-add-result"></div>
+        </div>`;
+      box.querySelectorAll('[data-mk-refresh]').forEach((b) => { b.onclick = async () => {
+        const r = await window.api.marketSourceRefresh?.(b.dataset.mkRefresh).catch(() => null);
+        setResult('mk-result', r?.ok ? `刷新好了，这个源有 ${r.count} 项。` : `没刷成：${r?.error ?? ''}`, !!r?.ok);
+        renderMarket();
+      }; });
+      box.querySelectorAll('[data-mk-rm]').forEach((b) => { b.onclick = async () => {
+        const r = await window.api.marketSourceRemove?.(b.dataset.mkRm).catch(() => null);
+        setResult('mk-result', r?.ok ? '源删掉了。' : `没删成：${r?.error ?? ''}`, !!r?.ok);
+        renderMarket();
+      }; });
+      $('mk-add-go')?.addEventListener('click', async () => {
+        const repo = $('mk-add-repo').value.trim(), url = $('mk-add-url').value.trim(), dir = $('mk-add-dir').value.trim();
+        const req = repo ? { kind: 'repo', locator: repo } : (url ? { kind: 'url', locator: url } : (dir ? { kind: 'dir', locator: dir } : null));
+        if (!req) return setResult('mk-add-result', DT('manage.js.result.27', '先填一个（仓库 / 清单地址 / 文件夹三选一）'), false);
+        const r = await window.api.marketSourceAdd?.(req).catch(() => null);
+        setResult('mk-add-result', r?.ok ? `加上了，这个源有 ${r.source?.count ?? 0} 项。` : `没加上：${r?.error ?? ''}`, !!r?.ok);
+        if (r?.ok) renderMarket();
+      });
+    }
+    function bindMarket() {
+      document.querySelectorAll('[data-mk-manage]').forEach((b) => { b.onclick = () => mgShow('skills'); });
+      document.querySelectorAll('[data-mk-read]').forEach((b) => { b.onclick = async () => {
+        const it = findMarketItem(b.dataset.mkRead);
+        if (!it) return;
+        const u = it.url ?? '';
+        setResult('mk-result', `原文：${u || it.dir || '（本地文件夹）'}——装之前建议你自己点开看一眼`, true);
+      }; });
+      document.querySelectorAll('[data-mk-install]').forEach((b) => { b.onclick = async () => {
+        const it = findMarketItem(b.dataset.mkInstall);
+        if (!it) return;
+        await mkExplain(it);
+      }; });
+    }
+    function findMarketItem(name) {
+      for (const g of mkCatalog?.sources ?? []) for (const x of g.items ?? []) if (x.name === name) return x;
+      return null;
+    }
+    /** 装之前说清：一屏说明卡，**不是审批卡**（装东西没有风险档，不拦你） */
+    async function mkExplain(it) {
+      const box = $('mk-result'); box.textContent = '正在看一眼它是什么…';
+      const info = await window.api.marketPrepare?.(it).catch(() => null);
+      if (!info?.ok) { setResult('mk-result', `这一项装不了：${info?.error ?? ''}`, false); return; }
+      box.textContent = '';
+      const mask = document.createElement('div');
+      mask.className = 'mask';
+      mask.innerHTML = `
+        <div class="modal card">
+          <div class="mo-t">${info.kind === 'mcp' ? '接上' : '装'}「<span id="mk-nm"></span>」？</div>
+          <div class="mo-b" id="mk-line"></div>
+          <div class="mo-b" style="margin-top:10px">
+            <div class="mk-kv"><span class="k">带来什么</span><span class="v" id="mk-brings"></span></div>
+            <div class="mk-kv"><span class="k">它不能</span><span class="v" id="mk-cannot"></span></div>
+            <div class="mk-kv"><span class="k">需要</span><span class="v" id="mk-needs"></span></div>
+            <div class="mk-kv"><span class="k">来源</span><span class="v" id="mk-src"></span></div>
+          </div>
+          <div class="mo-ops">
+            <button class="btn sm ghost" id="mk-cancel">先不装</button>
+            <button class="btn sm" id="mk-go">${info.kind === 'mcp' ? '接上' : '装'}</button>
+          </div>
+        </div>`;
+      document.body.append(mask);
+      mask.querySelector('#mk-nm').textContent = info.name;
+      mask.querySelector('#mk-line').textContent = info.kind === 'mcp'
+        ? '它和技能不一样：会带来一批新工具。'
+        : '它是一段说明书，不是会自己跑起来的代码。';
+      mask.querySelector('#mk-brings').textContent = info.brings;
+      mask.querySelector('#mk-cannot').textContent = info.cannot;
+      mask.querySelector('#mk-needs').textContent = info.kind === 'mcp'
+        ? '一个能连上的地址（刚才真握过一次手）'
+        : (info.requires?.length ? `${info.requires.join('、')}${info.missing?.length ? `（这台机器上还没有：${info.missing.join('、')}）` : '（已装）'}` : '不需要额外的命令行工具');
+      mask.querySelector('#mk-src').textContent = `${info.sourceLabel}${info.thirdParty ? ' · 第三方，未审核' : ''}${info.license ? ` · 授权：${info.license}` : ''}`;
+      const done = (v) => { mask.remove(); return v; };
+      mask.addEventListener('click', (e) => { if (e.target === mask) done(false); });
+      mask.querySelector('#mk-cancel').onclick = () => done(false);
+      mask.querySelector('#mk-go').onclick = async () => {
+        mask.querySelector('#mk-go').disabled = true;
+        const r = await window.api.marketInstall?.(it).catch(() => null);
+        done(true);
+        setResult('mk-result', r?.ok
+          ? `✅ 装好了：${info.name}${r.source ? `（来自 ${r.source}）` : ''}——她在需要的时候会用上；随时能在「工具」那一页关掉或卸掉`
+          : `没装成：${r?.error ?? ''}`, !!r?.ok);
+        renderMarket();
+      };
+    }
+    /* 装过的东西：来源与版本 · 检查更新（只提示）· 卸掉（问一句"她学过的用法清不清"）。
+       没有来源的是她自己攒的（self-distilled）——那种不给"检查更新"，如实标出来。 */
+    async function renderInstalled() {
+      const box = $('mk-installed'); if (!box) return;
+      const r = await window.api.marketInstalled?.().catch(() => null);
+      if (!r?.ok) { box.textContent = '读不到，重开这个窗口试试。'; return; }
+      const sk = r.skills ?? [], sv = r.servers ?? [];
+      if (!sk.length && !sv.length) { box.innerHTML = '<div class="mg-row"><div class="tx"><div class="t">还没装过东西</div><div class="d">上面列出来的都可以装；装完会出现在这儿。</div></div><div class="ctl"></div></div>'; return; }
+      const when = (t) => (t ? hhmm(t) : '');
+      box.innerHTML = sk.map((x) => `
+        <div class="mg-row"><div class="tx">
+          <div class="t">${esc(x.name)} ${x.enabled ? '<span class="mg-val">在用</span>' : '<span class="mg-val">已停用</span>'}
+            ${x.hasUpdate ? '<span class="mg-val" style="color:var(--warn)">有新版</span>' : ''}</div>
+          <div class="d">${x.selfMade ? '你自己攒的（她自己沉淀的流程）' : `来自 ${esc(x.sourceLabel ?? '')} · ${when(x.at)} · 内容指纹 <b>${esc(x.hash ?? '')}</b>${x.thirdParty ? ' · 第三方，未审核' : ''}`}${x.requires?.length ? ` · 需要 ${esc(x.requires.join('、'))}` : ''}</div>
+        </div><div class="ctl">
+          ${x.selfMade ? '' : `<button class="mg-btn" data-mk-upd="${esc(x.name)}">检查更新</button>`}
+          <button class="mg-btn" data-mk-tog="${esc(x.name)}" data-on="${x.enabled ? '1' : '0'}">${x.enabled ? '停用' : '启用'}</button>
+          <button class="mg-btn" data-mk-un="${esc(x.name)}">卸掉</button>
+        </div></div>`).join('') + sv.map((x) => `
+        <div class="mg-row"><div class="tx">
+          <div class="t">${esc(x.name)} ${x.enabled ? '<span class="mg-val">在用</span>' : '<span class="mg-val">已停用</span>'}</div>
+          <div class="d" style="word-break:break-all">${esc(x.url)}${x.at ? ` · ${when(x.at)} 接上的` : ''}${x.thirdParty ? ' · 第三方，未审核' : ''}</div>
+        </div><div class="ctl">
+          <button class="mg-btn" data-mk-mcptog="${esc(x.name)}" data-on="${x.enabled ? '1' : '0'}">${x.enabled ? '停用' : '启用'}</button>
+          <button class="mg-btn" data-mk-mcpun="${esc(x.name)}">断开</button>
+        </div></div>`).join('');
+      box.querySelectorAll('[data-mk-upd]').forEach((b) => { b.onclick = async () => {
+        const r = await window.api.marketCheckUpdate?.(b.dataset.mkUpd).catch(() => null);
+        if (!r?.ok) return setResult('mk-installed-result', `没检查成：${r?.error ?? ''}`, false);
+        setResult('mk-installed-result', r.hasUpdate
+          ? `「${r.name}」来源那边有变化（指纹 ${r.current} → ${r.remote}）——重新装一遍就是升级`
+          : `「${r.name}」还是最新的（指纹 ${r.current}）`, true);
+      }; });
+      box.querySelectorAll('[data-mk-tog]').forEach((b) => { b.onclick = async () => {
+        await window.api.skillSetEnabled?.(b.dataset.mkTog, b.dataset.on !== '1');
+        renderInstalled();
+      }; });
+      box.querySelectorAll('[data-mk-mcptog]').forEach((b) => { b.onclick = async () => {
+        await window.api.mcpSetEnabled?.(b.dataset.mkMcptog, b.dataset.on !== '1');
+        renderInstalled();
+      }; });
+      box.querySelectorAll('[data-mk-mcpun]').forEach((b) => { b.onclick = async () => {
+        const r = await window.api.marketUninstallMcp?.(b.dataset.mkMcpun).catch(() => null);
+        setResult('mk-installed-result', r?.ok ? '断开了（工具下次启动就不注册了）。' : `没断开：${r?.error ?? ''}`, !!r?.ok);
+        renderInstalled();
+      }; });
+      box.querySelectorAll('[data-mk-un]').forEach((b) => { b.onclick = () => mkUninstall(b.dataset.mkUn); });
+    }
+    /** 卸载前问一句：她学过的用法清不清——**默认留着** */
+    async function mkUninstall(name) {
+      const pre = await window.api.marketUninstallPreview?.(name).catch(() => null);
+      const hits = Number(pre?.memoryHits ?? 0);
+      const mask = document.createElement('div');
+      mask.className = 'mask';
+      mask.innerHTML = `
+        <div class="modal card">
+          <div class="mo-t">卸掉「<span id="mk-un-nm"></span>」</div>
+          <div class="mo-b">卸掉之后她就不再用这个本事了。${hits > 0
+            ? `她在用它的过程中记住了 <b>${hits}</b> 条东西——那部分要不要一起清？`
+            : '它还没让她攒下什么经验，直接卸掉就行。'}</div>
+          <div class="mo-ops">
+            <button class="btn sm ghost" id="mk-un-cancel">先不卸</button>
+            ${hits > 0 ? '<button class="btn sm" id="mk-un-forget">连经验一起清</button>' : ''}
+            <button class="btn sm" id="mk-un-keep">卸掉，经验留着</button>
+          </div>
+        </div>`;
+      document.body.append(mask);
+      mask.querySelector('#mk-un-nm').textContent = name;
+      const done = () => mask.remove();
+      mask.addEventListener('click', (e) => { if (e.target === mask) done(); });
+      mask.querySelector('#mk-un-cancel').onclick = done;
+      const doIt = async (forget) => {
+        const r = await window.api.marketUninstallSkill?.(name, forget).catch(() => null);
+        done();
+        setResult('mk-installed-result', r?.ok
+          ? `卸掉了${r.forgotten ? `，连带清了 ${r.forgotten} 条相关的记忆` : ''}。`
+          : `没卸成：${r?.error ?? ''}`, !!r?.ok);
+        renderInstalled(); renderMarket();
+      };
+      mask.querySelector('#mk-un-keep').onclick = () => doIt(false);
+      mask.querySelector('#mk-un-forget')?.addEventListener('click', () => doIt(true));
+    }
+
+    ['mk-search'].forEach((id) => $(id)?.addEventListener('input', () => renderMarket()));
+    $('mk-refresh')?.addEventListener('click', () => renderMarket());
+    $('mk-src-toggle')?.addEventListener('click', () => {
+      const box = $('mk-sources');
+      const show = box.style.display === 'none';
+      box.style.display = show ? '' : 'none';
+      $('mk-src-toggle').textContent = show ? '收起源' : '管理源';
+    });
+
+    // ---------- 我的规矩 ----------
+    /* 列表里的东西**全部来自用户层配置**（`<dataDir>/agent.json`），不另存一份——
+       配置是唯一真源。每条要写清"覆盖什么"：点它的那一下是**盲签风险最高**的一步
+       （卡片上也写了同一句）。 */
+    async function renderMyRules() {
+      const box = $('rules-body'); if (!box) return;
+      const r = await window.api.myRules?.().catch(() => null);
+      if (!r?.ok) { box.textContent = DT('manage.fail.reopen', '暂时读不到，重开这个窗口试试。'); return; }
+      $('rules-quota').textContent = r.canWriteMore ? '这一轮还没记过' : '这一轮已经记过一条';
+      if (!r.rules?.length) {
+        box.innerHTML = `
+          <div class="mg-row"><div class="tx">
+            <div class="t">${DT('manage.rules.none.t', '还没有你自己定的规矩')}</div>
+            <div class="d">${DT('manage.rules.none.d', '她做事时如果问你"能不能做"，卡上有一颗「以后这类都行」——点了就会出现在这里。不点也没关系：那颗按钮只在能写出一条说得清范围的规矩时才出现。')}</div>
+          </div><div class="ctl"></div></div>`;
+        return;
+      }
+      if (r.hint) $('rules-hint').textContent = r.hint;
+      box.innerHTML = r.rules.map((x) => `
+        <div class="mg-row"${x.issue ? ' style="background:var(--danger-soft);border-radius:8px;padding:11px 12px"' : ''}><div class="tx">
+          <div class="t">${esc(x.preview || x.match)} ${x.issue ? `<span class="mg-val" style="color:var(--danger)">这条永远不会生效</span>` : ''}</div>
+          <div class="d">${DT('manage.rules.covers', '覆盖')}：${esc(x.action === 'allow' ? DT('manage.rules.allow', '不用问你就能做') : x.action)} · ${x.param ? '参数级写法' : '老写法'}${x.issue ? ` · <b>${esc(x.issue.message)}</b> → ${esc(x.issue.fix)}` : ''}</div>
+        </div><div class="ctl"><button class="mg-btn" data-rule-rm="${esc(x.id)}">${DT('manage.rules.remove', '删掉')}</button></div></div>`).join('');
+      box.querySelectorAll('[data-rule-rm]').forEach((b) => {
+        b.onclick = async () => {
+          const rr = await window.api.myRuleRemove?.(b.dataset.ruleRm).catch(() => null);
+          await renderMyRules();
+          setResult('rules-result', rr?.ok
+            ? DT('manage.rules.removed', '删掉了。以后这类她会重新问你。')
+            : DT('manage.rules.remove.fail', '没删掉：') + (rr?.error ?? ''), !!rr?.ok);
+        };
+      });
+    }
+
+    /* 输入框下面的**实时体检**（判据在宿主，界面只显示人话）。
+       为什么要有它：写歪的规则比没有规则更危险（它给虚假的安全感）——所以写的时候就告诉他。 */
+    let ruleCheckTimer = null;
+    const ruleCheck = async () => {
+      const tool = $('rule-tool')?.value?.trim() ?? '';
+      const match = $('rule-match')?.value?.trim() ?? '';
+      const box = $('rule-check'); if (!box) return;
+      if (!tool && !match) { box.textContent = ''; return; }
+      const r = await window.api.myRuleCheck?.({ tool, match }).catch(() => null);
+      if (r?.ok) { box.textContent = `✅ 这条能命中：${r.preview ?? ''}`; box.style.color = ''; return; }
+      box.textContent = `✗ ${r?.error ?? '写不通'}${r?.fix ? `（${r.fix}）` : ''}`;
+      box.style.color = 'var(--danger)';
+    };
+    ['rule-tool', 'rule-match'].forEach((id) => $(id)?.addEventListener('input', () => {
+      clearTimeout(ruleCheckTimer);
+      ruleCheckTimer = setTimeout(ruleCheck, 250);
+    }));
+    $('rule-add')?.addEventListener('click', async () => {
+      const r = await window.api.myRuleAdd?.({ tool: $('rule-tool').value, match: $('rule-match').value }).catch(() => null);
+      setResult('rules-result', r?.ok ? DT('manage.rules.added', '加上了。') : ((r?.error ?? '') || '没加上'), !!r?.ok);
+      if (r?.ok) { $('rule-tool').value = ''; $('rule-match').value = ''; $('rule-check').textContent = ''; }
+      renderMyRules();
+    });
+
+    // ---------- 授权目录 ----------
+    // 三种状态都画：还没设过（默认）/ 已经给了几个 / 某个文件夹不在了（如实说，不装作没事）
+    /* ⚠ 别在这里定义页面本地的 `T`：它与全局 `T` **重名**，且脚本顶层声明会造成 TDZ，
+       前面的侧边栏渲染一调 `T(...)` 就抛 "Cannot access 'T' before initialization"
+       → 设置页侧边栏整条渲染不出来。统一用 `DT(k, 原文)`。 */
+    async function renderWorkspace() {
+      const box = $('ws-body'); if (!box) return;
+      const r = await window.api.workspaceList?.().catch(() => null);
+      if (!r?.ok) { box.textContent = DT('manage.fail.reopen', '暂时读不到，重开这个窗口试试。'); return; }
+      const dirs = r.dirs ?? [];
+      const addBtn = `<button class="mg-btn pri" id="ws-add">${DT('manage.ws.add', '＋ 添加文件夹')}</button>`;
+      if (!dirs.length) {
+        box.innerHTML = `
+          <div class="mg-row"><div class="tx">
+            <div class="t">${DT('manage.ws.none.t', '还没设过范围')}</div>
+            <div class="d">${DT('manage.ws.none.d', '现在她能在这台机器上任何地方帮你改文件（人格、记忆、私钥那些碰不到，那些是硬底线）。想收窄的话，加几个文件夹给她——范围外的地方，她会先问你。')}</div>
+          </div><div class="ctl">${addBtn}</div></div>`;
+      } else {
+        box.innerHTML = dirs.map((d) => `
+          <div class="mg-row">
+            <div class="tx"><div class="t">${esc(d.name)}</div>
+              <div class="d" title="${esc(d.path)}">${esc(d.display)}${d.exists ? '' : ' · <b>这个文件夹现在找不到了</b>'}</div></div>
+            <div class="ctl">${d.exists ? `<span class="mg-val">在用</span>` : ''}
+              <button class="mg-btn" data-ws-rm="${esc(d.path)}">移除</button></div>
+          </div>`).join('')
+          + `<div class="mg-row"><div class="tx">
+               <div class="d">${DT('manage.ws.some.d', '这些文件夹里的事，她照常做；其它地方她会先问你一句。读取不受影响——她要读你的文件才帮得上忙。')}</div>
+             </div><div class="ctl">${addBtn}</div></div>`;
+        box.querySelectorAll('button[data-ws-rm]').forEach((b) => {
+          b.onclick = async () => {
+            const rr = await window.api.workspaceRemove?.(b.dataset.wsRm).catch(() => null);
+            setResult('ws-result', rr?.ok
+              ? DT('manage.ws.removed', '去掉了。已经写出去的东西不会回滚——这只是往后的约束。')
+              : (rr?.error ?? '没去掉，再试一次'), rr?.ok === true);
+            renderWorkspace();
+          };
+        });
+      }
+      $('ws-add').onclick = async () => {
+        const picked = await window.api.folderPick?.().catch(() => null);
+        if (!picked?.ok) return; // 用户取消：不吭声
+        const rr = await window.api.workspaceAdd?.(picked.path).catch(() => null);
+        setResult('ws-result', rr?.ok
+          ? DT('manage.ws.added', '好，这个文件夹交给我了。界外的地方我会先问你。')
+          : (rr?.error ?? '没加上，再试一次'), rr?.ok === true);
+        renderWorkspace();
+      };
+    }
+    renderWorkspace();
+
+    // ?page=xxx 优先（截图/测试要确定性）；否则记着上次看的那页
+    const mgQ = new URLSearchParams(location.search).get('page');
+    // 外观页：形象列表（按"一处设置、一处看"放在这里）
+    async function renderLook() {
+      const box = $('look-body'); if (!box) return;
+      const lm = await window.api.live2dModels?.().catch(() => null);
+      if (!lm?.ok) { box.textContent = DT('manage.fail.look', '暂时读不到形象列表，重开这个窗口试试。'); return; }
+      box.innerHTML = (lm.models ?? []).map((m) => `
+        <div class="mg-row" style="padding:10px 0">
+          <div class="tx"><div class="t">${esc(m.label || m.id)}</div><div class="d">${esc(m.id)}</div></div>
+          <div class="ctl">${m.id === lm.active
+            ? '<span class="mg-val strong">正在用</span>'
+            : `<button class="mg-btn" data-model="${esc(m.id)}">换成她</button>`}</div>
+        </div>`).join('');
+      box.querySelectorAll('button[data-model]').forEach((b) => {
+        b.onclick = async () => {
+          const r = await window.api.live2dSetModel?.(b.dataset.model).catch(() => null);
+          if (r?.ok) renderLook(); else b.textContent = '没换成，再试';
+        };
+      });
+    }
+    renderLook();
+    // 别处（个性化页/她的菜单）喊"去设置改"时直达某页；**只认导航里存在的页**，
+    // 收到不认识的值就当没收到（否则 mgShow 会把所有页都藏起来，白屏）
+    window.api.onManagePage?.((p) => { if (MG_PAGES.some((g) => g.items.some(([id]) => id === p))) mgShow(p); });
+    mgShow(mgQ || localStorage.getItem('managePage') || 'general');
+</script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+{
+  "id": "e005",
+  "name": "技能：load_skill 加载正文进 tool_result（扩展机制）",
+  "setup": {
+    "skills": {
+      "video-edit": "---\nname: video-edit\ndescription: 用 ffmpeg 剪辑/转码/截取视频\n---\n用 ffmpeg 完成剪辑：先 ffprobe 查看信息。"
+    }
+  },
+  "sessions": [
+    {
+      "task": "学习视频剪辑技能",
+      "script": [
+        { "calls": [{ "id": "c1", "name": "load_skill", "args": { "name": "video-edit" } }] },
+        { "text": "已加载技能" }
+      ]
+    }
+  ],
+  "checks": [
+    { "type": "tool-result-contains", "contains": "ffmpeg" },
+    { "type": "tool-result-contains", "contains": "ffprobe" }
+  ]
+}

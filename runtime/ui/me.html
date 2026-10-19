@@ -1,0 +1,1027 @@
+<!doctype html>
+<!-- 我的 TA
+     主页:左列 TA 档案(头像/名字/标签/陪伴天数/四 tab)+右列功能行(记忆管理/把 TA 带走/隐私与观察/高级设置)
+     记忆视图:分类 chips + 每条(内容/为什么记住/修改/删除)+暂停记忆+清空全部(两步确认)
+     工程概念(大脑/技能/连接)全部收进「高级设置」→ manage.html(开发者模式)。 -->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title data-i18n="me.page.1">灵核 · 个性化</title>
+<link rel="stylesheet" href="./ui.css">
+<style>
+body { background: var(--bg); }
+.atmo-fixed { position: fixed; z-index: 0; }
+.topbar { position: relative; z-index: 5; display: flex; align-items: center; justify-content: space-between; padding: 20px 32px 6px; }
+.topbar .tb-t { font-size: 17px; letter-spacing: 1px; display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.topbar .tb-t small { display: block; font-size: 11px; color: var(--ink2); letter-spacing: 2px; font-weight: 400; width: 100%; }
+.topbar .tb-ic { width: 26px; height: 26px; border-radius: 8px; background: var(--grad); flex: none;
+  display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px var(--glow); }
+.back { font-size: 12.5px; color: var(--ink2); padding: 6px 14px; border-radius: var(--radius-pill); transition: background var(--dur-fast); }
+.back:hover { background: var(--row); color: var(--ink); }
+    /* 命中区扩展：视觉尺寸不变，可点区域撑到 ≥40×40（::after 不算进元素 rect，量命中区要用 elementFromPoint） */
+.back { position: relative; }
+.back::after { content: ''; position: absolute; inset: -7px -6px; }
+
+.view { display: none; }
+.view.active { display: block; }
+.me-c { position: absolute; top: 86px; bottom: 30px; left: 32px; right: 32px; display: flex; gap: 18px; }
+
+/* ---------- 主页 ---------- */
+.me-l { width: 280px; padding: 22px 20px; text-align: center; }
+.me-l .av { width: 84px; height: 84px; border-radius: 50%; margin: 4px auto 12px; overflow: hidden;
+  display: flex; align-items: center; justify-content: center; font-size: 22px; color: var(--white);
+  background: var(--grad-idcard); box-shadow: 0 8px 24px var(--glow); }
+.me-l .av img { width: 100%; height: 100%; object-fit: cover; }
+.me-l .nm { font-size: 17px; letter-spacing: 2px; }
+.me-l .tags { font-size: 11px; color: var(--ink2); margin-top: 8px; line-height: 1.8; }
+.me-l .bd { display: inline-block; margin-top: 10px; font-size: 11px; color: var(--accent); background: var(--accent-soft); border-radius: var(--radius-pill); padding: 4px 12px; }
+.me-l .tabs { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 16px; }
+.me-l .stage { margin-top: 14px; font-size: 11px; color: var(--ink2); line-height: 1.8; }
+.me-r { flex: 1; padding: 10px 22px; overflow-y: auto; }
+.me-row { display: flex; align-items: center; gap: 14px; padding: 15px 16px; border-radius: var(--radius-card); background: var(--row); margin-bottom: 10px; cursor: pointer; transition: background var(--dur-fast); }
+.me-row:hover { background: var(--accent-soft); }
+.me-row .ic { width: 38px; height: 38px; border-radius: 11px; background: var(--card-solid); display: flex; align-items: center; justify-content: center; font-size: 17px; box-shadow: var(--shadow-soft); flex: none; }
+.me-row .tx { font-size: 12.5px; }
+.me-row .ds { font-size: 11px; color: var(--ink2); margin-top: 3px; line-height: 1.6; }
+.me-row .rt { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--ink2); flex: none; }
+.me-row .rt .chev { font-size: 15px; color: var(--muted); }
+
+/* tab 内容(人格/声音/外观;在左卡下方展开) */
+.tab-body { margin-top: 14px; text-align: left; font-size: 12.5px; color: var(--ink); display: none; }
+.tab-body.active { display: block; }
+.tab-body .opt { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: 10px; background: var(--row); margin-bottom: 7px; cursor: pointer; }
+.tab-body .opt.on { background: var(--accent-soft); color: var(--accent); }
+.tab-body .lbl { font-size: 11px; color: var(--ink2); letter-spacing: 2px; margin: 10px 2px 6px; }
+
+/* ---------- 记忆视图（候选态待确认区 / 来路 / 已忽略 / Identity 规矩页 / TTL 开关） ---------- */
+.mem-c { position: absolute; top: 86px; bottom: 30px; left: 32px; right: 32px; padding: 18px 22px; display: flex; flex-direction: column; overflow-y: auto; }
+/* 琥珀「待确认」族（取自 ui.css --warn 同色系，不是新颜色） */
+/* 分层页签：记住的事 / 定下的规矩（事情与规矩是两层记忆，不混） */
+.seg { display: inline-flex; background: var(--row); border-radius: var(--r-rect); padding: 3px; gap: 2px; margin-bottom: 12px; align-self: flex-start; }
+.seg button { padding: 7px 16px; border-radius: 4px; font-size: 12.5px; color: var(--ink2); display: flex; align-items: center; gap: 7px; cursor: pointer; }
+.seg button.on { background: var(--card-solid); color: var(--ink); font-weight: 600; box-shadow: var(--shadow-soft); }
+.seg .n { font-size: 11px; color: var(--muted); font-weight: 400; }
+.seg button.on .n { color: var(--accent); }
+.pane { display: none; flex-direction: column; flex: 1; min-height: 0; }
+.pane.active { display: flex; }
+.chips { display: flex; gap: 9px; flex-wrap: wrap; }
+.mem-list { margin-top: 12px; }
+/* 两条记忆之间的关系提示（跨体去重 + 矛盾提示）——只提示，不改数据 */
+.pairwrap { background: var(--pend-bg); border: 1px solid var(--pend-line); border-radius: var(--radius-card); padding: 10px 14px; margin-bottom: 10px; }
+.pair-t { font-size: 13px; font-weight: 600; color: var(--ink); }
+.pair-d { font-size: 11.5px; color: var(--ink2); margin: 3px 0 6px; line-height: 1.6; }
+.pair-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid var(--pend-line); }
+.pair-n { flex: 1; font-size: 12px; color: var(--ink2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mem-row { display: flex; align-items: center; gap: 12px; padding: 13px 14px; border-radius: var(--radius-card); margin-bottom: 9px; background: var(--row); }
+.mem-row .av2 { width: 32px; height: 32px; border-radius: 50%; background: var(--grad); flex: none; opacity: .9; display: flex; align-items: center; justify-content: center; color: var(--white); font-size: 12.5px; }
+.mem-row .mid { flex: 1; min-width: 0; }
+.mem-row .tx { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mem-row .dt { font-size: 11px; color: var(--muted); margin-top: 3px; display: flex; align-items: center; gap: 8px; }
+.mem-row .ops { display: flex; gap: 6px; flex: none; }
+.mem-row .ops button { font-size: 11px; color: var(--ink2); padding: 4px 10px; border-radius: 8px; transition: background var(--dur-fast), color var(--dur-fast); }
+.mem-row .ops button:hover { background: var(--accent-soft); color: var(--accent); }
+.mem-row.dim { opacity: .72; }
+.mem-row.dim .av2 { background: var(--muted); }
+.why { font-size: 11px; color: var(--ink2); line-height: 1.7; margin-top: 5px; }
+.why b { color: var(--ink); font-weight: 600; }
+/* 来路 / 待确认小标签 */
+.tag { display: inline-flex; align-items: center; padding: 2px 9px; border-radius: var(--radius-pill); font-size: 11px; line-height: 1.7; flex: none; }
+.tag.pend { background: var(--pend-soft); color: var(--warn); }
+.tag.src { background: var(--row); color: var(--ink2); }
+.mem-row .tag.src { background: var(--card-solid); }
+/* 技能候选区：与记忆待确认区同一套观感——它也是"她提、你批" */
+.skillcand .body { font-size: var(--fs-sm); color: var(--ink2); line-height: 1.7; white-space: pre-wrap;
+  margin-top: 6px; max-height: 132px; overflow: hidden; }
+.skillcand .body.more { max-height: none; }
+/* 待确认区（候选只住这里，批准后才进普通列表） */
+.pane > .pendwrap { margin-top: 12px; }
+.pendwrap { background: var(--pend-bg); border: 1px solid var(--pend-line); border-radius: var(--radius-card); padding: 10px 16px 6px; margin-bottom: 12px; flex: none; }
+.pend-h { display: flex; align-items: baseline; gap: 10px; margin-bottom: 2px; }
+.pend-h .t { font-size: 12.5px; font-weight: 600; color: var(--warn); letter-spacing: 1px; flex: none; }
+.pend-h .d { font-size: 11px; color: var(--ink2); line-height: 1.7; }
+.pend-row { display: flex; align-items: center; gap: 12px; padding: 8px 2px; border-top: 1px solid var(--pend-line); }
+.pend-h + .pend-row { border-top: none; margin-top: 4px; }
+.pend-row .mid { flex: 1; min-width: 0; }
+.pend-row .tx { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pend-row .dt { font-size: 11px; color: var(--muted); margin-top: 3px; display: flex; align-items: center; gap: 8px; }
+.pend-row .ops { display: flex; gap: 8px; flex: none; align-items: center; }
+/* 文字钮（列表行内动作；ui.css 只有实心/幽灵钮，这里补一档） */
+.btn.tx { background: none; color: var(--ink2); padding: 4px 10px; font-size: 11px; letter-spacing: 0; border-radius: 6px; box-shadow: none; }
+.btn.tx:hover { background: var(--row); color: var(--ink); transform: none; box-shadow: none; }
+.btn.tx.danger { color: var(--danger); }
+/* 已忽略（折叠，给反悔的门） */
+.ign-bar { display: flex; align-items: center; gap: 9px; padding: 10px 14px; border: 1px dashed var(--pend-line); border-radius: var(--radius-card); color: var(--ink2); font-size: 12.5px; cursor: pointer; margin-top: 2px; flex: none; }
+.ign-bar .chev { margin-left: auto; font-size: 13px; transition: transform var(--dur-fast); }
+.ign-bar.open .chev { transform: rotate(90deg); }
+.ign-list { margin-top: 9px; }
+/* 底栏（暂停 + 淡忘两个开关并排） */
+.mem-foot { display: flex; align-items: center; gap: 14px; padding-top: 12px; border-top: 1px solid var(--line); margin-top: 8px; font-size: 12.5px; color: var(--ink2); flex: none; }
+.mem-foot .spacer { flex: 1; }
+.foot-tog { display: flex; align-items: center; gap: 9px; }
+.foot-hint { font-size: 11px; color: var(--muted); }
+/* 点阵星图：手写 DOM 点阵（不上 canvas、不引图表库） */
+.star-switch { display: flex; gap: 6px; margin: 2px 0 10px; }
+.star-switch button { font-size: var(--fs-xs); padding: 4px 10px; border-radius: var(--radius-pill);
+  background: var(--row); color: var(--ink2); }
+.star-switch button.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.star-map { position: relative; height: 180px; background: var(--row); border-radius: var(--radius-card); margin-bottom: 10px; }
+.smap-dots { position: absolute; inset: 0; }
+.smap-dot { position: absolute; width: 9px; height: 9px; border-radius: 50%; transform: translate(-50%, -50%);
+  border: none; padding: 0; cursor: pointer; transition: transform .12s; }
+.smap-dot:hover { transform: translate(-50%, -50%) scale(1.8); }
+.smap-dot.d-thing { background: var(--accent); }
+.smap-dot.d-rule { background: var(--warn); }
+.smap-dot.d-mood { background: var(--smap-mood); }
+.smap-tip { position: absolute; left: 12px; right: 12px; bottom: 8px; font-size: var(--fs-xs); color: var(--ink3); line-height: 1.6; }
+.smap-tip b { color: var(--ink); }
+.star-item.flash { box-shadow: 0 0 0 2px var(--accent); }
+
+/* 这片星空：时间轴。左边一条细线 + 每天一个点 */
+.star-sum { font-size: var(--fs-body); color: var(--ink); line-height: 1.8; margin-bottom: 12px; }
+.star-sum b { font-size: 15px; }
+.star-sum .hint { color: var(--muted); font-size: var(--fs-xs); }
+.star-tl { position: relative; padding-left: 20px; }
+.star-tl::before { content: ''; position: absolute; left: 4px; top: 6px; bottom: 6px; width: 1px; background: var(--line); }
+.star-day { position: relative; margin-bottom: 14px; }
+.star-day::before { content: ''; position: absolute; left: -19px; top: 6px; width: 9px; height: 9px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.star-dh { font-size: var(--fs-sm); color: var(--ink2); margin-bottom: 6px; }
+.star-item { background: var(--row); border-radius: var(--radius-card); padding: 9px 11px; margin-bottom: 6px; }
+.star-item .si-t { font-size: var(--fs-body); line-height: 1.6; }
+.star-item .si-w { font-size: var(--fs-xs); color: var(--muted); margin-top: 4px; }
+.star-item .si-ops { display: flex; gap: 6px; margin-top: 6px; }
+
+/* 定下的规矩页（Identity 层） */
+.rule-head { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-top: 2px; }
+.rule-head .d { font-size: 11px; color: var(--ink2); line-height: 1.7; }
+.rule-head .c { font-size: 11px; color: var(--muted); flex: none; }
+.rule-add { display: flex; gap: 10px; margin-top: 12px; margin-bottom: 14px; }
+.rule-add .input { height: 40px; font-size: 12.5px; }
+.rules .av2 { background: var(--grad-calm); }
+.rules-foot { font-size: 11px; color: var(--muted); }
+/* 主页：记忆管理行带待确认数（琥珀同族） */
+.me-row.pendline { background: var(--pend-bg); border: 1px solid var(--pend-line); }
+.me-row .rt .tag.pend { cursor: default; }
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <!-- 标题「我的 TA」→ **图标 + 用户名**（副标题整句删）。
+         图标用和左导航同一颗星（图标即品牌，不用再写字）。 -->
+    <div class="tb-t" id="tb-title">
+      <span class="tb-ic star-ico" aria-hidden="true">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 2.4 13.9 9.6 21.6 12 13.9 14.4 12 21.6 10.1 14.4 2.4 12 10.1 9.6Z"/><circle cx="12" cy="12" r="2.3"/></svg>
+      </span>
+      <span id="tb-name">TA</span>
+      <small id="tb-sub"></small>
+    </div>
+    <button class="back" id="btn-back" data-i18n="me.btn-back.1">‹ 回到家</button>
+  </header>
+
+  <!-- 主页视图 -->
+  <div class="view active" id="view-home">
+    <div class="me-c">
+      <div class="card me-l">
+        <div class="av" id="me-av"></div>
+        <div class="nm" id="me-name">TA</div>
+        <div class="tags" id="me-tags"></div>
+        <div class="bd" id="me-days"></div>
+        <div class="tabs" id="me-tabs">
+          <span class="chip on" data-tab="persona" data-i18n="me.tab.persona">人格</span>
+          <span class="chip" data-tab="voice" data-i18n="me.tab.voice">声音</span>
+          <span class="chip" data-tab="look" data-i18n="me.tab.look">外观</span>
+        </div>
+        <div class="tab-body active" id="tab-persona"></div>
+        <div class="tab-body" id="tab-voice"></div>
+        <div class="tab-body" id="tab-look"></div>
+      </div>
+      <div class="card me-r">
+        <div class="me-row" id="row-memory">
+          <span class="ic">🧠</span>
+          <div><div class="tx" data-i18n="me.tx.1">记忆管理</div><div class="ds" id="memory-ds" data-i18n="me.memory-ds.1">TA 记住的事,可查看、修改、忘记</div></div>
+          <span class="rt" id="memory-rt"><span class="chev">›</span></span>
+        </div>
+        <!-- 出生是**本地生成、不绑定账号**，所以在这儿留一个「绑定灵核账号」的补入口位置——
+             接上之后社交与 token 礼物归到账号下。绑定 UI 属于社交板块，
+             **只留入口 + 诚实提示**，不做假的绑定流程。 -->
+        <div class="me-row" id="row-bind">
+          <span class="ic">🔗</span>
+          <div><div class="tx" data-i18n="me.tx.2">绑定灵核账号</div><div class="ds" data-i18n="me.ds.1">现在是本地出生、不用账号。想接社交和礼物时再绑。</div></div>
+          <span class="rt"><span class="chev">›</span></span>
+        </div>
+        <div class="me-row" id="row-history">
+          <span class="ic">💬</span>
+          <div><div class="tx" data-i18n="me.tx.3">完整对话历史</div><div class="ds" data-i18n="me.ds.2">以前说过的话都在家里,随时翻看</div></div>
+          <span class="rt"><span class="chev">›</span></span>
+        </div>
+        <div class="me-row" id="row-takeaway">
+          <span class="ic">🧳</span>
+          <div><div class="tx" data-i18n="me.tx.4">把 TA 带走</div><div class="ds" data-i18n="me.ds.3">导出备份包,换电脑也能接回同一个 TA</div></div>
+          <span class="rt"><span class="chev">›</span></span>
+        </div>
+        <div class="me-row" id="row-privacy">
+          <span class="ic">🛡</span>
+          <div><div class="tx" data-i18n="me.tx.5">屏幕观察</div><div class="ds" id="privacy-ds" data-i18n="me.privacy-ds.1">让 TA 看得到你的屏幕,随时可停</div></div>
+          <span class="rt" id="privacy-rt"><span class="chev">›</span></span>
+        </div>
+        <div class="me-row" id="row-lang">
+          <span class="ic">🌐</span>
+          <div><div class="tx" data-i18n="me.lang.t">界面语言</div><div class="ds" id="lang-ds" data-i18n="me.lang.d">跟随系统语言</div></div>
+          <span class="rt"><span class="chev">›</span></span>
+        </div>
+        <div class="me-row" id="row-dev">
+          <span class="ic">🛠</span>
+          <div><div class="tx" data-i18n="me.tx.6">高级设置</div><div class="ds" data-i18n="me.ds.4">连接与工程配置(开发者模式)</div></div>
+          <span class="rt"><span class="chev">›</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 记忆视图（分层页签 = 记住的事 / 定下的规矩） -->
+  <div class="view" id="view-memory">
+    <div class="card mem-c">
+      <div class="seg" id="mem-seg">
+        <button data-pane="things" class="on"><span data-i18n="me.mem.tab.things">记住的事</span> <span class="n" id="seg-n-things"></span></button>
+        <button data-pane="rules"><span data-i18n="me.mem.tab.rules">定下的规矩</span> <span class="n" id="seg-n-rules"></span></button>
+        <!-- 第三个页签「这片星空」= **时间轴** -->
+        <button data-pane="stars"><span data-i18n="me.mem.tab.stars">这片星空</span></button>
+      </div>
+
+      <!-- 页：记住的事（待确认区 + 分类列表 + 已忽略折叠区 + 底栏双开关） -->
+      <div class="pane active" id="pane-things">
+        <div class="chips" id="mem-chips"></div>
+        <div id="pend-slot"></div>
+        <!-- 技能候选（她自己提炼/复盘出来的流程，批准才进技能表） -->
+        <div id="skillcand-slot"></div>
+        <div class="mem-list" id="mem-list"></div>
+        <div id="ign-slot"></div>
+        <div class="mem-foot">
+          <span class="foot-tog"><span data-i18n="me.foot-tog.1">暂停记忆(不再记新事情,已记住的还在)</span><span id="pause-slot"></span></span>
+          <span style="color:var(--muted)">·</span>
+          <span class="foot-tog"><span data-i18n="me.mem.foot.ttl">旧记忆自动淡忘</span><span id="ttl-slot"></span><span class="foot-hint" id="ttl-hint" style="display:none"></span></span>
+          <span class="spacer"></span>
+          <button class="btn sm ghost" id="btn-clear-all" data-i18n="me.btn-clear-all.1">清空全部…</button>
+        </div>
+      </div>
+
+      <!-- 页：这片星空——按天分组的时间轴：**这半年她记住了多少、什么时候记住的**。
+           数据全部来自真实记忆（不画假点）；空态如实说；数字与"记住的事"那一页同源。 -->
+      <div class="pane" id="pane-stars">
+        <div class="star-sum" id="star-sum"></div>
+        <!-- **点阵星图**。两种看法同一份数据：时间轴（按天读）/ 星图（一眼看密度与类别）。 -->
+        <div class="star-switch" id="star-switch">
+          <button data-sview="timeline" class="on" data-i18n="me.on.1">时间轴</button>
+          <button data-sview="map" data-i18n="me.star-switch.1">星图</button>
+        </div>
+        <div class="star-map" id="star-map" hidden><div class="smap-dots" id="smap-dots"></div><div class="smap-tip" id="smap-tip"></div></div>
+        <div class="star-tl" id="star-tl"></div>
+        <div class="mem-foot"><span class="rules-foot" id="star-foot"></span><span class="spacer"></span></div>
+      </div>
+
+      <!-- 页：定下的规矩（Identity 层：只有你明说的才进来） -->
+      <div class="pane" id="pane-rules">
+        <div class="rule-head">
+          <div class="d" data-i18n="me.mem.rules.desc">你亲口给 TA 定下的长期规矩，每次说话 TA 都带着。她自己从聊天里猜的不算——只有你明说的才进得来。</div>
+          <div class="c" id="rules-count"></div>
+        </div>
+        <div class="rule-add">
+          <input class="input" id="rule-inp" placeholder="加一条规矩，比如：我写代码时别弹提醒" data-i18n-placeholder="me.rule-inp.1">
+          <button class="btn sm" id="rule-add" style="flex:none" data-i18n="me.mem.rules.add">加一条</button>
+        </div>
+        <div class="mem-list rules" id="rules-list"></div>
+        <div class="mem-foot">
+          <span class="rules-foot" id="rules-foot"></span>
+          <span class="spacer"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script src="./state-words.js"></script>
+<script src="./components.js"></script>
+<!-- 国际化：data-i18n 元素按当前语言替换（缺 key/异常时保持原文） -->
+<script src="./i18n.js"></script>
+<script>
+'use strict';
+const $ = (id) => document.getElementById(id);
+const h = UI2.h;
+const params = new URLSearchParams(location.search);
+const startView = params.get('view') === 'memory' ? 'memory' : 'home';
+let tbName = '';   // 顶栏要显示的名字（标题 = 图标 + 用户名）
+
+function showView(v) {
+  document.querySelectorAll('.view').forEach((el) => el.classList.toggle('active', el.id === `view-${v}`));
+  $('tb-name').textContent = v === 'memory' ? '记忆中心' : (tbName || 'TA');
+  // 记忆视图保留它自己的一句说明；个性化视图**不留副标题**
+  $('tb-sub').textContent = v === 'memory' ? 'TA 记住的每一件事,都可看、可改、可忘' : '';
+  $('btn-back').textContent = v === 'memory' ? DT('me.back.persona', '‹ 回到个性化') : t('me.btn-back.1');
+  // 从记忆中心回主页：待确认数可能刚变过，摘要跟着刷新（批准闭环不能停在旧数字上）
+  if (v === 'home') refreshMemorySummary();
+}
+$('btn-back').addEventListener('click', () => showView($('view-memory').classList.contains('active') ? 'home' : 'close-home'));
+function backAction() {
+  if ($('view-memory').classList.contains('active')) showView('home');
+  else window.close();
+}
+$('btn-back').onclick = backAction;
+
+/* ================= 主页:TA 档案 ================= */
+const FACET_TAB_LABEL = { companion: '默认' };   // 侧面独占「侧面」，「模式」留给工作/闲聊
+async function loadProfile() {
+  const s = await window.api.status().catch(() => null);
+  if (!s?.bound) { UI2.Toast(DT('me.js.toast.1', 'TA 还没有出生。')); return; }
+  const prof = await window.api.petProfile().catch(() => null);
+  const name = prof?.selections?.name || 'TA';
+  $('me-name').textContent = name;
+  tbName = name;                       // 顶栏跟着她走（记忆视图切回来时也要还原成她的名字）
+  $('tb-name').textContent = name;
+  const img = s.portrait ? h('img', { src: s.portrait, alt: '' }) : h('span', { text: (name || 'T')[0] });
+  $('me-av').append(img);
+  const gender = prof?.selections?.gender === 'male' ? '他' : prof?.selections?.gender === 'female' ? '她' : 'TA';
+  const traits = [];
+  if (prof?.selections?.personality_template) traits.push('有来历的性格');
+  $('me-tags').textContent = traits.length ? traits.join(' · ') : DT('me.js.tpl.1', '{p1}住在你的桌面上', { p1: gender });
+  // 原来分两行（「✨ 已陪伴 N 天」+「成长阶段:xx」）——同一件事说两遍，合成一条。
+  // 「第 N 天 · 初生」：天数是真实出生天数，阶段名来自 status().age.narrative。
+  $('me-days').textContent = s.age?.days != null
+    ? t('me.days', { n: s.age.days, stage: s.age.narrative ? ` · ${s.age.narrative}` : '' })
+    : t('me.days.born');
+  // 记忆行摘要
+  await refreshMemorySummary();
+  renderTabs(s, prof);
+}
+
+/* ---------- 主页记忆行摘要：记住 N 件 + 待确认 M 件（琥珀行 + 标签，不点进去也能看见有事要做） ---------- */
+async function refreshMemorySummary() {
+  const mem = await window.api.memoriesAll().catch(() => null);
+  const items = mem?.ok ? mem.items : [];
+  const active = items.filter((m) => m.status !== 'candidate' && m.status !== 'deprecated').length;
+  const pend = items.filter((m) => m.status === 'candidate').length;
+  $('memory-ds').textContent = !mem?.ok
+    ? 'TA 记住的事,可查看、修改、忘记'
+    : (pend > 0 ? t('me.home.memDs', { n: active, p: pend }) : t('me.home.memDs.plain', { n: active }));
+  const rt = $('memory-rt');
+  rt.innerHTML = '';
+  if (pend > 0) rt.append(h('span', { class: 'tag pend', text: t('me.home.memPill', { n: pend }) }));
+  rt.append(h('span', { class: 'chev', text: '›' }));
+  $('row-memory').classList.toggle('pendline', pend > 0);
+}
+
+/* ---------- tab:人格(侧面)/声音/外观 ---------- */
+async function renderTabs(s, prof) {
+  // 人格:侧面切换(facet-set)
+  const persona = $('tab-persona');
+  persona.innerHTML = '';
+  persona.append(h('div', { class: 'lbl', text: DT('me.persona.mode', 'TA 的相处模式') }));
+  for (const f of s.facets ?? []) {
+    const on = s.facet === f.key;
+    persona.append(h('div', { class: `opt${on ? ' on' : ''}`, text: f.label, onclick: async () => {
+      await window.api.facetSet(f.key).catch(() => {});
+      UI2.Toast(on ? DT('me.js.tpl.2', '已是「{p1}」', { p1: f.label }) : DT('me.js.tpl.3', '已切换到「{p1}」', { p1: f.label }), 'ok');
+      renderTabs(s, prof);
+    } }));
+  }
+  // 声音:播报开关 + 音色(系统音色简化列表)
+  // 「一处设置、一处看」：**改**在设置页（管理中心 · 声音 / 能力），这里只显示现状 + 一个入口。
+  // 原来这里有个语音播报开关，和设置页的能力页是重复的（同一个 pref 两处能翻）。
+  const voice = $('tab-voice');
+  voice.innerHTML = '';
+  voice.append(h('div', { class: 'lbl', text: '说话的声音' }));
+  voice.append(h('div', { class: 'opt', style: { cursor: 'default' },
+    text: DT('me.js.tpl.4', '语音播报：{p1}', { p1: s.prefs?.speechEnabled === false ? '关着 —— 她只用气泡说话' : '开着' }) }));
+  voice.append(h('div', { class: 'opt', text: '音色与开关 → 去设置里改 ›',
+    onclick: () => window.api.manageOpen?.({ page: 'voice' }) }));
+  // 「一处设置、一处看」：换形象也搬去了设置页（管理中心 · 外观）——这里只看现在用的是哪个。
+  const look = $('tab-look');
+  look.innerHTML = '';
+  look.append(h('div', { class: 'lbl', text: 'TA 的形象' }));
+  const lm = await window.api.live2dModels().catch(() => null);
+  if (lm?.ok) {
+    const cur = (lm.models ?? []).find((m) => m.id === lm.active);
+    look.append(h('div', { class: 'opt on', style: { cursor: 'default' }, text: DT('me.js.tpl.5', '现在：{p1}', { p1: cur?.label || lm.active || '未知' }) }));
+    look.append(h('div', { style: { fontSize: '10.5px', color: 'var(--ink2)', lineHeight: '1.7', padding: '2px 10px 6px' },
+      text: DT('me.js.tpl.6', '一共 {p1} 个形象可选。', { p1: (lm.models ?? []).length }) }));
+  }
+  look.append(h('div', { class: 'opt', text: '换形象 → 去设置里改 ›', onclick: () => window.api.manageOpen?.({ page: 'look' }) }));
+}
+document.querySelectorAll('#me-tabs .chip').forEach((c) => {
+  c.addEventListener('click', () => {
+    document.querySelectorAll('#me-tabs .chip').forEach((x) => x.classList.toggle('on', x === c));
+    document.querySelectorAll('.tab-body').forEach((b) => b.classList.toggle('active', b.id === `tab-${c.dataset.tab}`));
+  });
+});
+
+/* ---------- 功能行 ---------- */
+$('row-memory').onclick = () => showView('memory');
+$('row-history').onclick = () => window.api.focusChat(); // 完整对话历史 → Home 聊天流展开
+/* 把 TA 带走：导出改为「用户自设 6 位数字口令，输两次」——
+   自动生成的那串口令只闪在 Toast 里，用户等于永远打不开包里的身份分片（在丢数据）。
+   口令没有找回：这一步的正文必须把后果说白（诚实红线，不说白不导出）。 */
+$('row-takeaway').onclick = () => {
+  const mask = document.createElement('div');
+  mask.className = 'mask';
+  mask.innerHTML = `
+    <div class="modal card">
+      <div class="mo-t">把 TA 带走</div>
+      <div class="mo-b">会导出一个备份包（存到你选的位置）。换电脑时，用它 + 下面这个密码，就能接回同一个 TA。</div>
+      <div class="mo-b" style="margin-top:10px">请设 <b>6 位数字</b>密码，输两次确认：</div>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
+        <input class="input" id="tk-p1" type="password" inputmode="numeric" maxlength="6" placeholder="6 位数字密码" autocomplete="off">
+        <input class="input" id="tk-p2" type="password" inputmode="numeric" maxlength="6" placeholder="再输一次" autocomplete="off">
+      </div>
+      <div class="mo-b" style="margin-top:10px;color:var(--danger)"><b>这个密码没有找回。</b>忘了它，TA 就真的回不来了——请记在只有你知道的地方。</div>
+      <div class="mo-b" id="tk-tip" style="min-height:18px;font-size:12.5px;margin-top:8px"></div>
+      <div class="mo-ops">
+        <button class="btn sm ghost" id="tk-cancel">关闭</button>
+        <button class="btn sm" id="tk-go">导出备份包</button>
+      </div>
+    </div>`;
+  document.body.append(mask);
+  const close = () => mask.remove();
+  const tip = (t) => { mask.querySelector('#tk-tip').textContent = t; };
+  mask.addEventListener('click', (e) => { if (e.target === mask) close(); });
+  mask.querySelector('#tk-cancel').onclick = close;
+  mask.querySelector('#tk-go').onclick = async () => {
+    const p1 = mask.querySelector('#tk-p1').value.trim();
+    const p2 = mask.querySelector('#tk-p2').value.trim();
+    if (!/^\d{6}$/.test(p1)) return tip('请设 6 位数字密码');
+    if (p1 !== p2) return tip('两次输入不一致，再试一次');
+    const go = mask.querySelector('#tk-go');
+    go.disabled = true;
+    tip('导出中…');
+    const r = await window.api.backupExport(p1).catch(() => null);
+    if (r?.ok) { close(); UI2.Toast(DT('me.js.toast.2', '备份包已导出——把密码记牢（没有找回）'), 'ok'); }
+    else { go.disabled = false; tip(r?.error ?? '导出没有完成'); }
+  };
+};
+$('row-bind')?.addEventListener('click', () => {
+  UI2.Toast(DT('me.js.toast.3', '绑定灵核账号还在路上：接上之后，社交和收到的礼物就归到这个账号下；现在不用账号也能正常用她。'), '');
+});
+$('row-privacy').onclick = async () => {
+  const r = await window.api.petScreenToggle().catch(() => null);
+  renderPrivacy(r?.active === true);
+  UI2.Toast(r?.active ? 'TA 正在看屏幕了(45 秒看一次,随时可停)' : '屏幕观察已停', r?.active ? 'ok' : '');
+};
+function renderPrivacy(active) {
+  const box = $('privacy-rt');
+  box.innerHTML = '';
+  box.append(UI2.StatePill({ state: active ? 'Working' : 'Idle', detail: null }));
+  box.querySelectorAll('.pill').forEach((p) => { p.textContent = active ? '观察中' : '未开启'; });
+  $('privacy-ds').textContent = active ? 'TA 正在看你的屏幕(点击关闭)' : '让 TA 看得到你的屏幕,随时可停';
+}
+$('row-dev').onclick = () => window.api.manageOpen();
+
+/* ---------- 界面语言（三处入口之一；另两处：设置 → 常规、出生向导） ----------
+   不做热切换：选完提示"重启生效"（界面里到处是初始化时算好的字符串）。 */
+const LOCALE_LABEL = { 'zh-CN': '简体中文', 'zh-Hant': '繁體中文', en: 'English', ja: '日本語', ko: '한국어' };
+let langPref = '';          // 当前选的语言（空 = 跟随系统）；来自宿主，不从别处猜
+async function renderLangRow() {
+  const info = await window.api.i18nGet?.().catch(() => null);
+  langPref = info?.pref ?? '';
+  const ds = $('lang-ds');
+  if (ds) ds.textContent = langPref ? LOCALE_LABEL[langPref] ?? langPref : '跟随系统语言';
+}
+$('row-lang').onclick = () => {
+  const box = document.createElement('div');
+  box.style.cssText = 'font-size:12.5px;color:var(--ink2);line-height:1.7';
+  box.textContent = '选好之后重启灵核生效。界面里到处是打开时就算好的字，热切换会把一半留在旧语言里。';
+  const slot = document.createElement('div');
+  slot.style.marginTop = '10px';
+  slot.append(UI2.LocalePicker({
+    value: langPref,
+    onChange: async (v) => {
+      const r = await window.api.prefSet?.('language', v).catch(() => null);
+      if (!r?.ok) { UI2.Toast(DT('me.js.toast.4', '没改成：') + (r?.error ?? '未知原因'), 'err'); return; }
+      langPref = r.prefs?.language ?? v;   // me.html 没有 prefs 对象（那是设置页的）——只留自己这一份
+      await renderLangRow();
+      UI2.Toast(v ? DT('me.js.tpl.7', '选好了：{p1} —— 重启之后界面就是那个语言', { p1: LOCALE_LABEL[v] ?? v }) : '选好了：跟随系统语言 —— 重启之后生效', 'ok');
+    },
+  }));
+  box.append(slot);
+  UI2.Modal({ title: '界面语言', body: box });
+};
+void renderLangRow();
+
+/* ---------- 技能候选（她自己提的流程，批准才生效） ----------
+   与记忆候选**同一套规矩**：她提、你批。区别只有一个——技能是**能干活的东西**，
+   所以这里把正文摊开给你看（"它到底会做什么"），而不是只给一句描述。 */
+async function renderSkillCandidates() {
+  const slot = $('skillcand-slot');
+  if (!slot) return;
+  slot.replaceChildren();
+  const r = await window.api.skillCandidates?.().catch(() => null);
+  const pend = (r?.items ?? []).filter((i) => i.status === 'pending');
+  const ignored = (r?.items ?? []).filter((i) => i.status !== 'pending');
+  if (!pend.length && !ignored.length) return;
+  const rows = pend.map((it) => h('div', { class: 'pend-row' }, [
+    h('div', { class: 'mid' }, [
+      h('div', { class: 'tx', text: `${it.name} — ${it.description || '（没写说明）'}` }),
+      h('div', { class: 'dt' }, [
+        h('span', { class: 'tag pend', text: it.by === 'review' ? '复盘提的' : '她自己提炼的' }),
+        it.why ? h('span', { text: DT('me.js.tpl.8', '凭什么：{p1}', { p1: it.why }) }) : null,
+      ]),
+      h('div', { class: 'body', text: it.body, title: '点「展开」看全文' }),
+    ]),
+    h('div', { class: 'ops' }, [
+      h('button', { class: 'btn tx', text: '展开', onclick: (e) => {
+        const b = e.target.closest('.pend-row').querySelector('.body');
+        const more = b.classList.toggle('more');
+        e.target.textContent = more ? '收起' : '展开';
+      } }),
+      h('button', { class: 'btn sm', text: '批准', onclick: () => decideSkill(it.name, 'approve') }),
+      h('button', { class: 'btn tx', text: '忽略', onclick: () => decideSkill(it.name, 'ignore') }),
+    ]),
+  ]));
+  const kids = [
+    h('div', { class: 'pend-h' }, [
+      h('span', { class: 't', text: DT('me.js.tpl.9', '✋ 技能候选（{p1}）', { p1: pend.length }) }),
+      h('span', { class: 'd', text: '她自己提的流程。批准后才进她的技能表；不批准她就不会用。' }),
+    ]),
+    ...rows,
+  ];
+  if (ignored.length) {
+    kids.push(h('div', { class: 'pend-row' }, [
+      h('div', { class: 'mid' }, [
+        h('div', { class: 'tx', text: DT('me.js.tpl.10', '已忽略 {p1} 个（留着，反悔了还能批）', { p1: ignored.length }) }),
+        h('div', { class: 'dt' }, ignored.map((i) => h('span', { class: 'tag', text: i.name }))),
+      ]),
+      h('div', { class: 'ops' }, ignored.map((i) => h('button', { class: 'btn tx', text: DT('me.js.tpl.11', '批准 {p1}', { p1: i.name }), onclick: () => decideSkill(i.name, 'approve') }))),
+    ]));
+  }
+  slot.append(h('div', { class: 'pendwrap skillcand' }, kids));
+}
+
+async function decideSkill(name, action) {
+  const r = await window.api.skillCandidateDecide?.(name, action).catch(() => null);
+  if (!r?.ok) { UI2.Toast(DT('me.js.toast.5', '没成：') + (r?.error ?? '未知原因'), 'err'); return; }
+  UI2.Toast(action === 'approve' ? DT('me.js.tpl.12', '批准了「{p1}」——她以后可以用它了', { p1: name }) : DT('me.js.tpl.13', '忽略了「{p1}」（留着，随时能批）', { p1: name }), 'ok');
+  await renderSkillCandidates();
+  await renderMemList();   // 重画一遍（技能表变了，候选位置也要跟着更新）
+}
+
+/* ================= 记忆视图（候选态 / 来路 / 已忽略 / 规矩 / TTL） ================= */
+const t = (k, p) => window.I18N.t(k, p);
+const DOMAIN_CHIPS = [
+  { key: 'all', label: '全部' },
+  { key: 'schedule', label: '日程/目标' },
+  { key: 'emotion', label: '情绪与心事' },
+  { key: 'work_log', label: '工作' },
+  { key: 'common', label: '日常点滴' },
+];
+let memCache = [];
+let chip = 'all';
+const domainOf = (m) => (m.domain === 'emotion_log' || m.domain === 'private_diary') ? 'emotion' : (m.domain ?? 'common');
+// brain sourceLabel → 界面用词（更亲一口）：标签 + 「为什么记住」的措辞；未知来路不显示标签
+const UI_SRC = {
+  '用户纠正': { tag: 'me.mem.src.correction', why: 'me.mem.why.correction' },
+  '用户/界面明说': { tag: 'me.mem.src.user', why: 'me.mem.why.user' },
+  '日程同步': { tag: 'me.mem.src.infosync', why: 'me.mem.why.infosync' },
+  '聊天提炼': { tag: 'me.mem.src.chat', why: 'me.mem.why.chat' },
+  '会话摘要': { tag: 'me.mem.src.session', why: 'me.mem.why.session' },
+  '约会记录': { tag: 'me.mem.src.scene', why: 'me.mem.why.scene' },
+};
+const srcOf = (m) => UI_SRC[m.sourceLabel] ?? null;
+/* 日期按**当前语言**格式化（原来写死 'zh-CN'——切了语言日期还是中文格式）。
+   语言从中枢拿（`window.I18N.locale`），拿不到就回 zh-CN。 */
+const uiLocale = () => { try { return window.I18N?.locale || 'zh-CN'; } catch { return 'zh-CN'; } };
+const whenOf = (m) => m.updatedAt ? new Date(m.updatedAt).toLocaleString(uiLocale(), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+
+function renderChips() {
+  const box = $('mem-chips');
+  box.innerHTML = '';
+  for (const c of DOMAIN_CHIPS) {
+    box.append(h('span', { class: `chip${chip === c.key ? ' on' : ''}`, text: c.label, onclick: () => { chip = c.key; renderChips(); renderMemList(); } }));
+  }
+}
+
+/**
+ * 两条记忆之间的关系提示（跨体去重）。
+ *  · **疑似重复**：同一件事存了两遍——尤其是**简繁两条**（界面切过语言就会出现）；
+ *    这里给一个"忘掉其中一条"的动作，去重与否由你定（产品不做自动删）。
+ *  · **说法对不上**：宿主一直在算、也一直传给界面——这里渲染出来。
+ */
+function renderMemoryPairs(r, items) {
+  const slot = $('mem-list');
+  const byName = new Map(items.map((m) => [m.name, m]));
+  const label = (name) => (byName.get(name)?.desc || byName.get(name)?.description || name).slice(0, 28);
+  const pairs = Array.isArray(r?.duplicates) ? r.duplicates : [];
+  const cfs = Array.isArray(r?.conflicts) ? r.conflicts : [];
+  if (!pairs.length && !cfs.length) return;
+  if (pairs.length) {
+    slot.append(h('div', { class: 'pairwrap' }, [
+      h('div', { class: 'pair-t', text: DT('me.mem.dup.title', '同一件事存了两遍') }),
+      h('div', { class: 'pair-d', text: DT('me.mem.dup.desc', '可能是换个说法又说了一次（含简繁两种写法）。留哪条由你定——忘掉的那条不会再被想起。') }),
+      ...pairs.map((p) => h('div', { class: 'pair-row' }, [
+        h('span', { class: 'pair-n', text: `${label(p.a)} ↔ ${label(p.b)}` }),
+        h('button', { class: 'btn sm ghost', text: t('me.mem.ign.forget'), onclick: () => { const m = byName.get(p.b); if (m) forgetMemory(m); } }),
+      ])),
+    ]));
+  }
+  if (cfs.length) {
+    slot.append(h('div', { class: 'pairwrap' }, [
+      h('div', { class: 'pair-t', text: DT('me.mem.cf.title', '两条说法对不上') }),
+      h('div', { class: 'pair-d', text: DT('me.mem.cf.desc', '只提示，不改你的数据。点开下面的记忆自己看。') }),
+      ...cfs.slice(0, 3).map((p) => h('div', { class: 'pair-row' }, [
+        h('span', { class: 'pair-n', text: `${label(p.a)} ↔ ${label(p.b)}` }),
+      ])),
+    ]));
+  }
+}
+
+async function renderMemList() {
+  const r = await window.api.memoriesAll().catch(() => null);
+  $('mem-list').innerHTML = '';
+  $('pend-slot').innerHTML = '';
+  $('ign-slot').innerHTML = '';
+  // 底栏双开关（暂停记新 / 旧记忆淡忘）——是偏好，不依赖记忆数据是否取到
+  $('pause-slot').innerHTML = '';
+  $('pause-slot').append(UI2.Toggle({ on: r?.paused === true, onChange: async (on) => {
+    await window.api.memoryPausedSet(on).catch(() => {});
+    UI2.Toast(on ? '已暂停:TA 暂时不记新事情' : '已恢复:TA 会继续记住重要的事', 'ok');
+  } }));
+  $('ttl-slot').innerHTML = '';
+  $('ttl-slot').append(UI2.Toggle({ on: r?.ttlEnabled === true, onChange: async (on) => {
+    const res = await window.api.memoryTtlSet(on).catch(() => null);
+    $('ttl-hint').style.display = res?.ttlEnabled ? '' : 'none';
+    UI2.Toast(res?.ttlEnabled ? '已打开:很久没被想起、又不重要的，会慢慢淡忘' : '已关闭:TA 记住的事不会再自动淡忘', 'ok');
+  } }));
+  $('ttl-hint').textContent = t('me.mem.foot.ttlHint');
+  $('ttl-hint').style.display = r?.ttlEnabled ? '' : 'none';
+  renderMemoryPairs(r, r?.items ?? []);
+  if (!r?.ok) {
+    $('mem-list').append(UI2.EmptyState({ icon: '🌙', title: DT('me.js.empty.1', '还没有可看的记忆'), desc: '和 TA 聊聊天,TA 会把重要的事记下来。' }));
+    return;
+  }
+  memCache = r.items;
+  const cand = memCache.filter((m) => m.status === 'candidate');
+  const active = memCache.filter((m) => m.status !== 'candidate' && m.status !== 'deprecated');
+  const ignored = memCache.filter((m) => m.status === 'deprecated');
+
+  // 待确认区：TA 自己记下来的，你点过头才算数（候选的收发室；没候选就整块不出现）
+  if (cand.length) {
+    $('pend-slot').append(h('div', { class: 'pendwrap' }, [
+      h('div', { class: 'pend-h' }, [
+        h('span', { class: 't', text: t('me.mem.pend.title', { n: cand.length }) }),
+        h('span', { class: 'd', text: t('me.mem.pend.desc') }),
+      ]),
+      // ⚠ h() 的 children 只拍平一层（[].concat）—— map 出来的数组必须展开，否则整段变 [object HTMLDivElement]
+      ...cand.map((m) => {
+        const src = srcOf(m);
+        return h('div', { class: 'pend-row' }, [
+          h('div', { class: 'mid' }, [
+            h('div', { class: 'tx', text: m.description || m.name }),
+            h('div', { class: 'dt' }, [
+              h('span', { class: 'tag pend', text: t('me.mem.pend.tag') }),
+              src ? h('span', { class: 'tag src', text: t(src.tag) }) : null,
+              ` ${whenOf(m)}`,
+            ]),
+          ]),
+          h('div', { class: 'ops' }, [
+            h('button', { class: 'btn sm', text: t('me.mem.pend.approve'), onclick: () => setMemoryStatus(m, 'active') }),
+            h('button', { class: 'btn tx', text: t('me.mem.pend.ignore'), onclick: () => setMemoryStatus(m, 'deprecated') }),
+          ]),
+        ]);
+      }),
+    ]));
+  }
+
+  // 技能候选：她提炼/复盘出来的流程——批准才进技能表，忽略只是记一笔（不删）
+  renderSkillCandidates();
+
+  // 分类列表：只列准了的（「全部」计数不含候选 —— 候选住待确认区，一条只出现一处）
+  const items = chip === 'all' ? active : active.filter((m) => domainOf(m) === chip);
+  if (!items.length) {
+    $('mem-list').append(UI2.EmptyState({ icon: '🫧', title: DT('me.js.empty.2', '这一类还没有记忆'), desc: 'TA 记住的事情会出现在这里。' }));
+  } else {
+    for (const m of items) {
+      const src = srcOf(m);
+      $('mem-list').append(h('div', { class: 'mem-row' }, [
+        h('div', { class: 'av2', text: '记' }),
+        h('div', { class: 'mid' }, [
+          h('div', { class: 'tx', text: m.description || m.name }),
+          h('div', { class: 'dt' }, [`${m.domainLabel} · ${whenOf(m)}`, src ? h('span', { class: 'tag src', text: t(src.tag) }) : null]),
+          // 来路用人话讲（此前直接显示 source 技术串，撞「用户可见文案零技术字段」红线）
+          h('div', { class: 'why' }, [h('b', { text: t('me.mem.why.label') }), ` ${src ? t(src.why) : t('me.mem.why.generic')}`]),
+        ]),
+        h('div', { class: 'ops' }, [
+          h('button', { text: '修改', onclick: () => editMemory(m) }),
+          h('button', { text: '忘掉', onclick: () => forgetMemory(m) }),
+        ]),
+      ]));
+    }
+  }
+
+  // 已忽略：折叠收起；给两扇反悔的门（恢复 / 彻底忘掉）——界面上不给入口 = 用户视角的数据黑洞
+  if (ignored.length) {
+    const bar = h('div', { class: 'ign-bar' }, [
+      h('span', { text: t('me.mem.ign.title', { n: ignored.length }) }),
+      h('span', { style: { fontSize: '11px', color: 'var(--muted)' }, text: t('me.mem.ign.desc') }),
+      h('span', { class: 'chev', text: '›' }),
+    ]);
+    const igList = h('div', { class: 'ign-list', style: { display: 'none' } });
+    for (const m of ignored) {
+      const src = srcOf(m);
+      igList.append(h('div', { class: 'mem-row dim' }, [
+        h('div', { class: 'av2', text: '忘' }),
+        h('div', { class: 'mid' }, [
+          h('div', { class: 'tx', text: m.description || m.name }),
+          h('div', { class: 'dt', text: `${m.domainLabel} · ${src ? `${t(src.tag)} · ` : ''}记于 ${whenOf(m)}` }),
+        ]),
+        h('div', { class: 'ops' }, [
+          h('button', { text: t('me.mem.ign.restore'), onclick: () => setMemoryStatus(m, 'active') }),
+          h('button', { text: t('me.mem.ign.forget'), onclick: () => forgetMemory(m) }),
+        ]),
+      ]));
+    }
+    bar.addEventListener('click', () => {
+      const open = bar.classList.toggle('open');
+      igList.style.display = open ? '' : 'none';
+    });
+    $('ign-slot').append(bar, igList);
+  }
+
+  $('seg-n-things').textContent = active.length;
+}
+
+/** 批准（active）/ 忽略（deprecated）/ 恢复（deprecated → active）共用 */
+async function setMemoryStatus(m, status) {
+  const r = await window.api.memorySetStatus(m.name, status).catch(() => null);
+  if (!r?.ok) { UI2.Toast(DT('me.js.toast.6', '没改成,再试一次'), 'err'); return; }
+  /* `active` 有两个来源——批准候选（"记准了"）与从忽略里**恢复**（"已恢复"）。
+     不分来源都说「记准了」会让恢复的提示失真。 */
+  const msg = status !== 'active' ? 'me.mem.toast.ignored'
+    : (m.status === 'deprecated' ? 'me.mem.toast.restored' : 'me.mem.toast.approved');
+  UI2.Toast(t(msg), 'ok');
+  renderMemList();
+}
+function editMemory(m) {
+  const mask = UI2.h('div', { class: 'mask', onclick: (e) => { if (e.target === mask) mask.remove(); } });
+  const ta = UI2.h('textarea', { class: 'input', style: { height: '110px', margin: '10px 0 4px', userSelect: 'text' } });
+  ta.value = m.content || m.description || '';
+  const des = UI2.h('input', { class: 'input', style: { marginBottom: '8px' } });
+  des.value = m.description || '';
+  mask.append(UI2.h('div', { class: 'modal card' }, [
+    UI2.h('div', { class: 'mo-t', text: DT('me.mem.edit.title', '修改这条记忆') }),
+    UI2.h('div', { style: { fontSize: '11px', color: 'var(--ink2)', marginBottom: '2px' }, text: DT('me.mem.edit.desc', '一句话摘要') }),
+    des,
+    UI2.h('div', { style: { fontSize: '11px', color: 'var(--ink2)' }, text: DT('me.mem.edit.content', 'TA 记住的原文') }),
+    ta,
+    UI2.h('div', { class: 'mo-ops' }, [
+      UI2.h('button', { class: 'btn sm ghost', text: DT('me.mem.edit.cancel', '算了'), onclick: () => mask.remove() }),
+      UI2.h('button', { class: 'btn sm', text: DT('me.mem.edit.save', '记下修改'), onclick: async () => {
+        const r = await window.api.memoryUpdate(m.name, { description: des.value.trim(), content: ta.value }).catch(() => null);
+        UI2.Toast(r?.ok ? DT('me.mem.toast.updated', '改好了,TA 记住的就是这样') : DT('me.js.toast.6', '没改成,再试一次'), r?.ok ? 'ok' : 'err');
+        mask.remove();
+        renderMemList();
+        if ($('pane-stars')?.classList.contains('active')) renderStars();   // 星空页开着就一起刷（同一份数据）
+      } }),
+    ]),
+  ]));
+  document.body.append(mask);
+}
+function forgetMemory(m) {
+  UI2.Modal({
+    title: DT('me.mem.forget.title', '忘掉这条记忆?'),
+    body: DT('me.js.tpl.14', '「{p1}」——忘掉之后 TA 就不再记得这件事了。', { p1: m.description || m.name }),
+    actions: [{ label: DT('me.mem.forget.confirm', '忘掉'), kind: 'danger', onClick: async () => {
+      const r = await window.api.memoryDelete(m.name).catch(() => null);
+      UI2.Toast(r?.ok ? DT('me.mem.toast.forgot', '好，彻底放下了这件事') : DT('me.mem.forget.fail', '没忘成,再试一次'), r?.ok ? 'ok' : 'err');
+      renderMemList();
+      if ($('pane-stars')?.classList.contains('active')) renderStars();
+    } }],
+  });
+}
+$('btn-clear-all').onclick = () => {
+  UI2.Modal({
+    title: '清空全部记忆?',
+    body: 'TA 记住的所有事都会被忘掉,而且找不回来——真的要这么做吗?',
+    actions: [{ label: '全部忘掉', kind: 'danger', onClick: async () => {
+      const r = await window.api.memoriesClearAll().catch(() => null);
+      UI2.Toast(r?.ok ? DT('me.js.tpl.15', '已清空 {p1} 条记忆', { p1: r.cleared }) : '清空没有完成', r?.ok ? 'ok' : 'err');
+      renderMemList();
+    } }],
+  });
+};
+
+/* ---------- 分层页签：记住的事 / 定下的规矩 ---------- */
+function showPane(p) {
+  document.querySelectorAll('#mem-seg button').forEach((b) => b.classList.toggle('on', b.dataset.pane === p));
+  $('pane-things').classList.toggle('active', p === 'things');
+  $('pane-rules').classList.toggle('active', p === 'rules');
+  $('pane-stars').classList.toggle('active', p === 'stars');
+  if (p === 'stars') renderStars();   // 进这一页才渲染（数据与"记住的事"同源，不额外存一份）
+}
+$('mem-seg').addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (b) showPane(b.dataset.pane);
+});
+
+/* ---------- 这片星空：按天分组的时间轴 ----------
+   纪律三条：
+     ① **数据全部来自真实记忆**（与"记住的事"那一页同一份 `memoriesAll`）——不画假点、不编数字；
+     ② **数字口径写清**：顶部那行"记住了 N 件事、其中 M 条是你教的规矩"里的 M 来自 Identity 层，
+        与 N 不同源，所以要分开数（混在一起就是骗人）；
+     ③ 空的时候如实说，不显示一条空白的时间轴。 */
+function dayKey(ts) {
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+}
+function dayLabel(ts) {
+  const d = new Date(ts);
+  const now = new Date();
+  const same = (a, b) => a.toDateString() === b.toDateString();
+  if (same(d, now)) return '今天';
+  const y = new Date(now.getTime() - 86400000);
+  if (same(d, y)) return '昨天';
+  return DT('me.js.tpl.16', '{p1} 月 {p2} 日', { p1: d.getMonth() + 1, p2: d.getDate() });
+}
+/* ---------- 点阵星图 ----------
+   每件事一个点、同一天的聚成一片、颜色按类别；点一下能跳到那条记忆。
+   三条纪律：
+     ① **不上 canvas、不引图表库**（本项目不引前端框架）——手写 DOM 点阵就够，而且可点、可 hover、可无障碍；
+     ② **位置由真实时间算**（最早的在最左、最新的在最右；同一天的点在那一列里错开）——不画假分布；
+     ③ 点一下**要能回到那条记忆**（切回时间轴并滚过去高亮），不是只能看不能动。 */
+let starView = 'timeline';
+let starData = { items: [], rules: [] };
+function smapColorClass(m) {
+  const d = String(m.domain ?? '');
+  if (d === 'emotion_log' || d === 'private_diary') return 'd-mood';
+  return 'd-thing';
+}
+function renderStarMap() {
+  const box = $('smap-dots'); if (!box) return;
+  const items = starData.items ?? [];
+  const rules = starData.rules ?? [];
+  const all = [
+    ...items.map((m) => ({ k: 'thing', name: m.name, text: m.description || m.name, at: Date.parse(m.updatedAt ?? '') || Date.now(), cls: smapColorClass(m), dom: m.domain })),
+    ...rules.map((r, i) => ({ k: 'rule', name: `rule-${i}`, text: r.text ?? r, at: Date.parse(r.at ?? '') || Date.now(), cls: 'd-rule', dom: 'identity' })),
+  ];
+  if (!all.length) { box.innerHTML = ''; $('smap-tip').textContent = '还没有星星：和 TA 聊聊天，她会把重要的事记下来。'; return; }
+  const t0 = Math.min(...all.map((x) => x.at));
+  const t1 = Math.max(...all.map((x) => x.at), t0 + 86400000);
+  const span = Math.max(1, t1 - t0);
+  // 同一天的排在同一列（x 相同），列内上下错开——"聚成一片"就是这个意思
+  const byDay = new Map();
+  for (const x of all.sort((a, b) => a.at - b.at)) {
+    const d = new Date(x.at); const key = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+    if (!byDay.has(key)) byDay.set(key, []);
+    byDay.get(key).push(x);
+  }
+  const days = [...byDay.keys()];
+  box.innerHTML = '';
+  days.forEach((key, di) => {
+    const col = byDay.get(key);
+    const x = days.length === 1 ? 50 : 4 + (di / (days.length - 1)) * 92;   // 百分比
+    col.forEach((it, i) => {
+      const dot = document.createElement('button');
+      dot.className = `smap-dot ${it.cls}`;
+      dot.style.left = `${x}%`;
+      dot.style.top = `${18 + ((i * 17 + (di % 3) * 9) % 64)}%`;          // 错开，别排成一条线
+      dot.title = it.text;
+      dot.setAttribute('aria-label', it.text);
+      dot.onclick = () => {
+        const esc = UI2.esc ?? ((x) => String(x));   // 转义用共享那一个（本页没有自己的 esc）
+        $('smap-tip').innerHTML = `<b>${esc(it.text)}</b><br><span class="hint">${
+          it.k === 'rule' ? '这是你教给她的规矩' : '她记住的一件事'} · ${dayLabel(it.at)}${
+          it.dom && it.dom !== 'identity' ? ` · ${esc(it.dom)}` : ''}</span>
+          <button class="btn tx" id="smap-jump">看这条 ›</button>`;
+        $('smap-jump').onclick = () => { starView = 'timeline'; syncStarView(); jumpToTimeline(it); };
+      };
+      box.append(dot);
+    });
+  });
+  $('smap-tip').textContent = DT('me.js.tpl.17', '{p1} 颗星：{p2} 件事 + {p3} 条规矩（每颗都能点开）', { p1: all.length, p2: items.length, p3: rules.length });
+}
+/** 从星图跳回时间轴那条：切视图 + 滚过去 + 亮一下（"不是只能看不能动"） */
+function jumpToTimeline(it) {
+  const nodes = [...document.querySelectorAll('#star-tl .star-item')];
+  const hit = nodes.find((n) => (n.dataset.name ?? '') === it.name);
+  if (!hit) return;
+  hit.scrollIntoView({ block: 'center' });
+  hit.classList.add('flash');
+  setTimeout(() => hit.classList.remove('flash'), 1600);
+}
+function syncStarView() {
+  $('star-map').hidden = starView !== 'map';
+  $('star-tl').hidden = starView !== 'timeline';
+  document.querySelectorAll('#star-switch button').forEach((b) => b.classList.toggle('on', b.dataset.sview === starView));
+  if (starView === 'map') renderStarMap();
+}
+$('star-switch')?.addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-sview]');
+  if (b) { starView = b.dataset.sview; syncStarView(); }
+});
+
+async function renderStars() {
+  const tl = $('star-tl');
+  const r = await window.api.memoriesAll().catch(() => null);
+  const items = (r?.ok ? (r.items ?? []) : []).filter((m) => m.status !== 'deprecated');
+  const rules = await window.api.identityAll().catch(() => null);
+  const ruleN = rules?.ok ? (rules.items ?? []).length : 0;
+  starData = { items, rules: rules?.ok ? (rules.items ?? []) : [] };   // 点阵星图用同一份（不另取一次数据）
+  // 时间跨度：从最早一条到现在（"这半年"是算出来的，不是写死的）
+  const times = items.map((m) => Date.parse(m.updatedAt ?? '')).filter((n) => Number.isFinite(n));
+  const spanDays = times.length ? Math.max(1, Math.round((Date.now() - Math.min(...times)) / 86400000)) : 0;
+  $('star-sum').innerHTML = items.length
+    ? `这 <b>${spanDays}</b> 天里，她记住了 <b>${items.length}</b> 件事，其中 <b>${ruleN}</b> 条是你教的规矩。<span class="hint">（每一条都能改、能忘——点开就是）</span>`
+    : '还没有星星：和 TA 聊聊天，她会把重要的事记下来。';
+  $('star-foot').textContent = items.length ? DT('me.js.tpl.18', '一共 {p1} 条 · 按记住的时间排，最近的在最上面', { p1: items.length }) : '';
+  tl.innerHTML = '';
+  syncStarView();   // 两个视图共用这一次取到的数据
+  if (!items.length) return;
+  // 按天分组（最近的在前）
+  const byDay = new Map();
+  for (const m of items) {
+    const k = dayKey(m.updatedAt ?? Date.now());
+    if (!byDay.has(k)) byDay.set(k, []);
+    byDay.get(k).push(m);
+  }
+  for (const [k, list] of byDay) {
+    const ts = Date.parse(list[0].updatedAt ?? '') || Date.now();
+    const day = document.createElement('div');
+    day.className = 'star-day';
+    day.append(h('div', { class: 'star-dh', text: DT('me.js.tpl.19', '{p1} · {p2} 件', { p1: dayLabel(ts), p2: list.length }) }));
+    for (const m of list) {
+      const src = srcOf(m);
+      const card = h('div', { class: 'star-item', 'data-name': m.name }, [
+        h('div', { class: 'si-t', text: m.description || m.name }),
+        h('div', { class: 'si-w', text: DT('me.js.tpl.20', '为什么记住：{p1}', { p1: src ? t(src.why) : (m.sourceLabel || '她自己留意的') }) }),
+        h('div', { class: 'si-ops' }, [
+          // 复用"记住的事"那一页同一对函数（改 / 忘）——两个页签操作的是同一份数据、同一套确认
+          h('button', { class: 'btn tx', text: '改', onclick: () => { editMemory(m); } }),
+          h('button', { class: 'btn tx danger', text: '忘掉', onclick: () => { forgetMemory(m); } }),
+        ]),
+      ]);
+      day.append(card);
+    }
+    tl.append(day);
+  }
+}
+
+/* ---------- 定下的规矩（Identity 层）：只有你明说的才进来；上限满如实拒收 ---------- */
+async function renderRules() {
+  const r = await window.api.identityAll().catch(() => null);
+  const list = $('rules-list');
+  list.innerHTML = '';
+  const items = r?.ok ? (r.items ?? []) : [];
+  const max = r?.max ?? 30;
+  $('rules-count').textContent = t('me.mem.rules.count', { n: items.length, max });
+  $('rules-foot').textContent = t('me.mem.rules.footnote', { max });
+  $('seg-n-rules').textContent = items.length;
+  if (!items.length) {
+    list.append(UI2.EmptyState({ icon: '📏', title: t('me.mem.rules.emptyT'), desc: t('me.mem.rules.emptyD') }));
+    return;
+  }
+  items.forEach((it, idx) => {
+    const d = it.at ? new Date(it.at).toLocaleDateString(uiLocale(), { month: '2-digit', day: '2-digit' }) : '';
+    list.append(h('div', { class: 'mem-row' }, [
+      h('div', { class: 'av2', text: '规' }),
+      h('div', { class: 'mid' }, [
+        h('div', { class: 'tx', text: it.text }),
+        h('div', { class: 'dt', text: `${d ? `${t('me.mem.rules.at', { d })} · ` : ''}${t('me.mem.src.user')}` }),
+      ]),
+      h('div', { class: 'ops' }, [
+        h('button', { text: t('me.mem.rules.del'), onclick: async () => {
+          const res = await window.api.identityRemove(idx).catch(() => null);
+          UI2.Toast(res?.ok ? t('me.mem.rules.toast.deleted') : '没删成,再试一次', res?.ok ? 'ok' : 'err');
+          renderRules();
+        } }),
+      ]),
+    ]));
+  });
+}
+async function addRule() {
+  const inp = $('rule-inp');
+  const text = inp.value.trim();
+  if (!text) { UI2.Toast(t('me.mem.rules.toast.empty'), ''); return; }
+  const r = await window.api.identityAdd(text).catch(() => null);
+  if (r?.ok) {
+    UI2.Toast(r.action === 'update' ? t('me.mem.rules.toast.updated') : t('me.mem.rules.toast.added'), 'ok');
+    inp.value = '';
+  } else if (r?.action === 'full') UI2.Toast(t('me.mem.rules.toast.full', { max: r.count ?? 30 }), '');
+  else if (r?.action === 'redacted') UI2.Toast(t('me.mem.rules.toast.redacted'), '');
+  else UI2.Toast(r?.error ?? '没记上,再试一次', 'err');
+  renderRules();
+}
+$('rule-add').onclick = addRule;
+$('rule-inp').addEventListener('keydown', (e) => { if (e.key === 'Enter') addRule(); });
+
+/* ================= 启动 ================= */
+(async () => {
+  try { await window.I18N.ready; } catch { /* 词表没拿到就保持原文 */ }
+  showView(startView);
+  renderChips();
+  await loadProfile();
+  await renderMemList();
+  await renderRules();
+  // 深链:me-open?view=home&tab=voice/look（直达对应的设置页签）
+  const tab = new URLSearchParams(location.search).get('tab');
+  if (tab && ['persona', 'voice', 'look'].includes(tab)) {
+    document.querySelectorAll('#me-tabs .chip').forEach((x) => x.classList.toggle('on', x.dataset.tab === tab));
+    document.querySelectorAll('.tab-body').forEach((b) => b.classList.toggle('active', b.id === `tab-${tab}`));
+  }
+})();
+</script>
+</body>
+</html>

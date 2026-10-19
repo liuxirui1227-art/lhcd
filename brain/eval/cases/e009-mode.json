@@ -1,0 +1,18 @@
+{
+  "id": "e009",
+  "name": "模式：她动手了 → 自动进工作模式（行为档）",
+  "session_mode_hint": "chat",
+  "sessions": [
+    {
+      "task": "帮我把结论写进一个文件",
+      "script": [
+        { "calls": [{ "id": "c1", "name": "write", "args": { "path": "note.txt", "content": "结论" } }] },
+        { "text": "写好了" }
+      ]
+    }
+  ],
+  "checks": [
+    { "type": "event-contains", "event": "mode.change", "contains": "behavior" },
+    { "type": "file-content", "path": "note.txt", "contains": "结论" }
+  ]
+}

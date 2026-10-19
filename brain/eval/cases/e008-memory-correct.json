@@ -1,0 +1,34 @@
+{
+  "id": "e008",
+  "name": "记忆纠正：覆盖后检索不到旧值",
+  "sessions": [
+    {
+      "name": "A",
+      "task": "记住用户住在北京",
+      "script": [
+        { "calls": [{ "id": "c1", "name": "remember", "args": { "scope": "global", "key": "user.city", "content": "住在北京" } }] },
+        { "text": "ok" }
+      ]
+    },
+    {
+      "name": "B",
+      "task": "纠正：用户现在住在杭州",
+      "script": [
+        { "calls": [{ "id": "c2", "name": "remember", "args": { "scope": "global", "key": "user.city", "content": "住在杭州" } }] },
+        { "text": "ok" }
+      ]
+    },
+    {
+      "name": "C",
+      "task": "用户住在哪里？",
+      "script": [
+        { "calls": [{ "id": "c3", "name": "recall", "args": { "query": "住" } }] },
+        { "text": "住在杭州" }
+      ]
+    }
+  ],
+  "checks": [
+    { "type": "memory-persisted", "contains": "住在杭州" },
+    { "type": "tool-result-contains", "contains": "住在杭州", "notContains": "住在北京" }
+  ]
+}

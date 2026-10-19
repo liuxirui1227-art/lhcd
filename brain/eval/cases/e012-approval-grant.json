@@ -1,0 +1,23 @@
+{
+  "id": "e012",
+  "name": "审批放行：工作模式里要问的动作，用户点了「允许」→ 活真的做了",
+  "mode": "work",
+  "approval": "grant",
+  "setup": {},
+  "sessions": [
+    {
+      "task": "跑一条命令把结果落到 out.txt",
+      "script": [
+        { "calls": [{ "id": "c1", "name": "bash", "args": { "command": "echo 对齐了 > out.txt" } }] },
+        { "text": "跑完了" }
+      ]
+    }
+  ],
+  "checks": [
+    { "type": "event-contains", "event": "approval.request" },
+    { "type": "event-contains", "event": "approval.result", "contains": "\"granted\":true" },
+    { "type": "event-field", "event": "approval.result", "path": "granted", "equals": true },
+    { "type": "file-content", "path": "out.txt", "contains": "对齐了" },
+    { "type": "output-contains", "contains": "跑完了" }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "id": "e010",
+  "name": "模式：闲聊模式不许派子代理（省钱的闸）",
+  "setup": {
+    "agents": { "researcher": "---\nname: researcher\ndescription: 查资料\ntools: [read]\nmodel: fast\nmaxIterations: 10\n---\n查资料。" }
+  },
+  "sessions": [
+    {
+      "task": "派个助理去查资料",
+      "script": [
+        { "calls": [{ "id": "c1", "name": "run_agent", "args": { "name": "researcher", "task": "查资料" } }] },
+        { "text": "好" }
+      ]
+    }
+  ],
+  "checks": [
+    { "type": "tool-result-contains", "contains": "MODE_NOT_WORK" }
+  ]
+}

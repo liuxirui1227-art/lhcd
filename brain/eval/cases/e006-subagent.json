@@ -1,0 +1,25 @@
+{
+  "id": "e006",
+  "name": "subagent：工具白名单隔离（子代理无法 write）",
+  "setup": {
+    "agents": {
+      "reviewer": "---\nname: reviewer\ndescription: 只读代码审查员\ntools: [read]\nmodel: fast\nmaxIterations: 20\n---\n你是只读审查员，只输出问题清单。"
+    }
+  },
+  "mode": "work",
+  "sessions": [
+    {
+      "task": "让 reviewer 审查 a.txt",
+      "script": [
+        { "calls": [{ "id": "c1", "name": "run_agent", "args": { "name": "reviewer", "task": "审查 a.txt" } }] },
+        { "calls": [{ "id": "c2", "name": "write", "args": { "path": "x.txt", "content": "越权" } }] },
+        { "text": "审查完成" },
+        { "text": "宿主收到结论" }
+      ]
+    }
+  ],
+  "checks": [
+    { "type": "tool-result-contains", "contains": "UNKNOWN_TOOL" },
+    { "type": "output-contains", "contains": "宿主收到结论" }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "id": "e004",
+  "name": "自我校验：未核实数字被标注【未核实】（防幻觉）",
+  "sessions": [
+    {
+      "task": "帮我查一下价格",
+      "script": [
+        { "calls": [{ "id": "c1", "name": "bash", "args": { "command": "echo 42 元" } }] },
+        { "text": "价格是 99 元" }
+      ]
+    }
+  ],
+  "checks": [
+    { "type": "no-unverified-number" },
+    { "type": "output-contains", "contains": "【未核实】" }
+  ]
+}

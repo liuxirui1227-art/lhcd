@@ -1,0 +1,31 @@
+{
+  "name": "lhcd-runtime",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "灵核 · 智能体桌面宿主（macOS）",
+  "main": "main.mjs",
+  "scripts": {
+    "prestart": "node scripts/prestart-check.mjs",
+    "start": "electron .",
+    "test": "node --test '*.test.mjs'",
+    "dist:mac": "node scripts/build-dmg.mjs",
+    "dist:mac-arm": "node scripts/build-dist.mjs --mac-arm",
+    "dist:win": "node scripts/build-dist.mjs --win",
+    "dist:all": "node scripts/build-dist.mjs --all"
+  },
+  "devDependencies": {
+    "docx": "^9.7.1",
+    "electron": "^33.0.0",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
+    "exceljs": "^4.4.0",
+    "jszip": "^3.10.2",
+    "lunar-javascript": "^1.7.7",
+    "mammoth": "^1.12.3",
+    "pdf-lib": "^1.17.1"
+  },
+  "dependencies": {
+    "pdf-parse": "^2.4.5"
+  }
+}

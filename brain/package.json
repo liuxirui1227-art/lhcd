@@ -1,0 +1,17 @@
+{
+  "name": "@lhcd/brain",
+  "private": true,
+  "type": "module",
+  "description": "灵核 · 智能体大脑（Agent-Harness 通用实现规格书 v4.0 实现，零运行时依赖）",
+  "main": "dist/index.js",
+  "bin": { "agent": "dist/bin/agent.js" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "tsc -p tsconfig.json && node --test \"dist/**/*.test.js\"",
+    "agent": "node dist/bin/agent.js"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.5.0"
+  }
+}

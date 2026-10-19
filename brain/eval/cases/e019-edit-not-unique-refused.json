@@ -1,0 +1,25 @@
+{
+  "id": "e019",
+  "name": "edit 不唯一就拒绝：同一句话出现两次 → 报「匹配 2 处，必须唯一」且**文件一个字节没动**",
+  "setup": {
+    "files": {
+      "list.md": "- 待办：交周报\n- 待办：交周报\n- 待办：订会议室\n"
+    }
+  },
+  "sessions": [
+    {
+      "task": "把 list.md 里的「待办：交周报」去掉一条",
+      "script": [
+        { "calls": [{ "id": "c1", "name": "edit", "args": { "path": "list.md", "oldString": "- 待办：交周报", "newString": "- 已完成：交周报" } }] },
+        { "text": "这处不唯一，我没动。" }
+      ]
+    }
+  ],
+  "checks": [
+    { "type": "tool-result-contains", "contains": "匹配 2 处" },
+    { "type": "tool-result-contains", "contains": "必须唯一" },
+    { "type": "file-content", "path": "list.md", "contains": "- 待办：交周报" },
+    { "type": "file-content", "path": "list.md", "notContains": "已完成" },
+    { "type": "output-contains", "contains": "不唯一" }
+  ]
+}

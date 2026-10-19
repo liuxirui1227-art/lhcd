@@ -1,0 +1,20 @@
+{
+  "id": "e015",
+  "name": "验证契约：工作模式里干了活 → 必须给得出验证报告（§20/§21）",
+  "mode": "work",
+  "setup": { "files": { "年报.txt": "营收 1240 万" } },
+  "sessions": [
+    {
+      "task": "读一下年报，然后告诉我做完了",
+      "script": [
+        { "calls": [{ "id": "c1", "name": "read", "args": { "path": "年报.txt" } }] },
+        { "text": "年报我读完了，营收是 1240 万，这件事做完了。" }
+      ]
+    }
+  ],
+  "checks": [
+    { "type": "event-contains", "event": "verify.report" },
+    { "type": "event-field", "event": "verify.report", "path": "passed", "exists": true },
+    { "type": "event-field", "event": "verify.report", "path": "confidence", "exists": true }
+  ]
+}

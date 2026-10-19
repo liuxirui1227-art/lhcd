@@ -1,0 +1,8 @@
+{
+  "name": "phase0-eval",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "eval": "node run-eval.mjs"
+  }
+}

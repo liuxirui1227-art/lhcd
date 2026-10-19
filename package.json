@@ -1,0 +1,10 @@
+{
+  "name": "lhcd",
+  "version": "1.0.0",
+  "private": true,
+  "description": "灵核 monorepo 根：**没有依赖**，只放跨包的回归门槛脚本（npm run gate）。各包自己的脚本在 brain/ core/ runtime/ eval/ 里。",
+  "type": "module",
+  "scripts": {
+    "gate": "node scripts/gate.mjs"
+  }
+}

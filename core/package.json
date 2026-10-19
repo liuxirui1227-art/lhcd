@@ -1,0 +1,23 @@
+{
+  "name": "@dh/core",
+  "private": true,
+  "type": "module",
+  "description": "数字人操作系统 · 灵魂引擎（框架无关，平台/运行时/云端共用）",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^3.0.0"
+  },
+  "allowScripts": {
+    "esbuild": true
+  },
+  "dependencies": {
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1"
+  }
+}

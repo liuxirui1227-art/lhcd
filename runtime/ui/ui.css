@@ -1,0 +1,1077 @@
+/* ============================================================
+   灵核 UI 2.0 · 视觉地基 ui.css
+   纪律:全产品统一 Token,页面禁止硬编码色值逃逸(下述变量之外取色需先在本文件定义)
+   深浅色:html[data-theme="light|dark|auto"],auto/缺省跟随系统(prefers-color-scheme)
+   动效纪律:交互 200~350ms(见 --dur-*);氛围漂移 ≥8s 周期低透明度;不炫技
+   ============================================================ */
+
+/* ---------- 1. 核心令牌(浅色为基准) ---------- */
+:root {
+  /* 文字 */
+  --ink: #1B1B1F;            /* 主文字（近黑中性，原 #2A2440 偏紫）*/
+  --ink2: #6E6E76;           /* 次文字（中性灰；对比度约 5.2:1）*/
+  --ink-inv: #F7F4FF;        /* 深底上的文字 */
+  --ink-inv2: rgba(247, 244, 255, .62);
+
+  /* 待确认（琥珀）色阶：me 页「待确认」行 / 标签 / 忽略条共用（**值一字未改**，只从页面收进 token） */
+  --pend-bg: rgba(201, 151, 63, .08);
+  --pend-line: rgba(201, 151, 63, .24);
+  --pend-soft: rgba(201, 151, 63, .16);
+  /* 记忆页星图的心情点（与 --mood-* 五档同族；迁移时值未改） */
+  --smap-mood: #E08BB4;
+  /* 松弛态头像渐变（与 --mood-calm 同色系）· 我的 TA 身份卡头像 */
+  --grad-calm: linear-gradient(120deg, #5AA97C, #8FCBA8);
+  --grad-idcard: radial-gradient(circle at 40% 34%, #FFE9D2, #C9B4FF 72%);
+  /* 白（实心主色块上的文字、以及叠在玻璃上的白字都用它）——页面里不再写 #fff / 十六进制 */
+  --white: #fff;
+  /* ---------- 从页面收进来的同值 token ----------
+     原则：**值一字不改**，只把散在页面里的色值收成一处；渲染必须逐字节不变（截图验）。 */
+  --on-glass-1: #efe9ff;        /* 深玻璃上的一级文字 */
+  --on-glass-2: #CFC8E6;        /* 深玻璃上的二级文字（待批卡说明 / 悬浮态） */
+  --on-glass-3: #9a8fc4;        /* 深玻璃上的三级文字（返回项 / 分组小标题） */
+  --violet: #8b6fe0;            /* 强调紫（比 --pri 深一档；出生页/形象端/舞台共用） */
+  --pri-a05: rgba(124, 106, 240, .05);
+  --pri-a10: rgba(124, 106, 240, .10);
+  --pri-a22: rgba(124, 106, 240, .22);
+  --pri-a55: rgba(124, 106, 240, .55);
+  --pri-a65: rgba(124, 106, 240, .65);
+  --pri-a28: rgba(180, 158, 255, .28);
+  --pri-a30: rgba(139, 111, 224, .30);
+  --pri-a40: rgba(157, 131, 255, .40);
+  --pri-a45: rgba(139, 111, 224, .45);
+  /* 半透明白（叠在玻璃/场景上的层级）：按档取，页面不再散写 rgba(255,255,255,…) */
+  --w-06: rgba(255, 255, 255, .06);
+  --w-08: rgba(255, 255, 255, .08);
+  --w-10: rgba(255, 255, 255, .10);
+  --w-12: rgba(255, 255, 255, .12);
+  --w-15: rgba(255, 255, 255, .15);
+  --w-18: rgba(255, 255, 255, .18);
+  --w-20: rgba(255, 255, 255, .20);
+  --w-65: rgba(255, 255, 255, .65);
+  --w-85: rgba(255, 255, 255, .85);
+  --w-55: rgba(255, 255, 255, .55);
+  --w-60: rgba(255, 255, 255, .60);
+  /* ---------- 出现 ≥2 次的色值一并收编 ---------- */
+  --black: #000;                     /* 纯黑（阴影/遮罩底） */
+  --scrim-30: rgba(0, 0, 0, .3);
+  --scrim-38: rgba(0, 0, 0, .38);
+  --scrim-50: rgba(0, 0, 0, .5);
+  --scrim-60: rgba(0, 0, 0, .6);
+  --w-05: rgba(255, 255, 255, .05);
+  --w-07: rgba(255, 255, 255, .07);
+  --w-45: rgba(255, 255, 255, .45);
+  --pri-a14: rgba(139, 111, 224, .14);
+  --pri-a50: rgba(139, 111, 224, .50);
+  --pri-a60: rgba(139, 111, 224, .60);
+  --pri-a28b: rgba(124, 106, 240, .28);
+  --warn-bg: #FFF7E8;                /* 提醒/注意事项的浅底 */
+  --warn-ink: #8A6216;               /* 同上的深字（对比度就按它算） */
+  --warn-line: #F3E2BE;              /* 同上的描边 */
+  --ok-ink: #3F7F5C;                 /* 成功态文字 */
+  --ok-bg: rgba(90, 169, 124, .14);  /* 成功态浅底 */
+  --ok-bright: #7FD8A4;              /* 成功态亮色（深底上用） */
+  --ok-mint: #9FE0C0;                /* 成功态薄荷色（形象端/家页共用） */
+  --ink-soft: #6F66A0;               /* 次要文字（比 --ink2 更紫一点，深底上更清楚） */
+  --ink-soft-2: #C4BCE4;             /* 深底上的次要文字 */
+  --ink-soft-3: #CFC6F2;             /* 深底上的次要文字（亮一档） */
+  --err-soft: #FFB3B3;               /* 错误态（深底上） */
+  --err-ink: #C05252;                /* 错误态文字（浅底上） */
+  --rose-a30: rgba(201, 123, 123, .30);   /* 出错/危险浅底 */
+  --rose-a40: rgba(201, 123, 123, .40);
+  /* ---------- 按主题族：形象端与家页的场景/玻璃/情绪色 ---------- */
+  /* 形象端：深玻璃面板族（pet 里原本是页面局部变量，现在收成公共供给） */
+  --glass-bg: rgba(24, 18, 44, .72);
+  --glass-line: rgba(180, 158, 255, .24);
+  --glass-ink: #f4f0ff;
+  --glass-accent: #b9a8ff;
+  --night-55: rgba(20, 14, 40, .55);
+  --night-55b: rgba(22, 16, 42, .55);
+  --accent-2: #b7a6ff;                       /* 对话页预览标题用的次强调色（原来是 var() 的兜底字面量） */
+  --night-70: rgba(20, 14, 40, .70);
+  --night-72: rgba(22, 16, 42, .72);
+  --night-80: rgba(22, 16, 42, .80);
+  --night-82: rgba(28, 22, 52, .82);
+  --night-88: rgba(22, 16, 42, .88);
+  --night-92: rgba(20, 14, 40, .92);
+  --deep-85: rgba(30, 22, 56, .85);
+  --deep-94: rgba(30, 22, 56, .94);
+  --deep-97: rgba(30, 22, 56, .97);
+  --glass-94: rgba(30, 25, 48, .94);
+  --on-glass-0: #f2edff;
+  --on-glass-4: #9C93B8;
+  --on-glass-5: #8F87B5;
+  --on-glass-6: #B9B2D2;
+  --scrim-35: rgba(0, 0, 0, .35);
+  --scrim-40: rgba(0, 0, 0, .40);
+  --w-09: rgba(255, 255, 255, .09);
+  /* 形象端：待批卡（同意/拒绝、风险三档） */
+  --allow: rgba(96, 186, 120, .85);
+  --allow-hover: rgba(110, 205, 135, .95);
+  --deny: rgba(214, 96, 96, .80);
+  --deny-hover: rgba(230, 115, 115, .90);
+  --err-a18: rgba(255, 138, 138, .18);
+  --err-a55: rgba(255, 138, 138, .55);
+  --gold-a16: rgba(255, 200, 120, .16);
+  --ok-a16: rgba(127, 216, 164, .16);
+  --ok-mint-2: #a5e8c0;
+  /* 形象端：主色与情绪光环（气泡描边 / aura / 球体） */
+  --pri-a28c: rgba(139, 111, 224, .28);
+  --pri-a34: rgba(124, 106, 240, .34);
+  --pri-a35: rgba(139, 111, 224, .35);
+  --pri-a40c: rgba(139, 111, 224, .40);
+  --pri-a60b: rgba(124, 106, 240, .60);
+  --pri-a88: rgba(124, 106, 240, .88);
+  --pri-lite-a20: rgba(157, 131, 255, .20);
+  --pri-lite-a26: rgba(157, 131, 255, .26);
+  --pri-lite-a45: rgba(200, 186, 255, .45);
+  --pri-lite-a60: rgba(157, 131, 255, .60);
+  --pri-lite-a75: rgba(200, 186, 255, .75);
+  --pri-lite-a80: rgba(157, 131, 255, .80);
+  --pri-lite-ink: #9d83ff;
+  --pri-lite-ink-2: #b79cff;
+  --bubble-joy-line: rgba(255, 214, 170, .38);
+  /* 喜悦态**整颗带出品牌紫**，不只是描一条边。 */
+  --bubble-joy-bg: linear-gradient(135deg, rgba(110, 91, 216, .94) 0%, rgba(139, 111, 224, .92) 58%, rgba(169, 139, 240, .90) 100%);
+  --bubble-joy-tail: rgba(122, 99, 222, .93);
+  --bubble-angry-line: rgba(255, 150, 150, .36);
+  --bubble-comfort-line: rgba(170, 220, 255, .32);
+  --aura-dim: rgba(10, 6, 22, .55);
+  --aura-neutral: rgba(150, 120, 255, .40);
+  --aura-comfort: rgba(255, 170, 140, .50);
+  --aura-knowledge: rgba(120, 180, 255, .45);
+  --orb-glow: rgba(140, 110, 230, .80);
+  --orb-1: #cbb8ff; --orb-2: #7c5cd6; --orb-3: #4a3588;
+  --opaque-1: #171230; --opaque-2: #0d0a1a;
+  /* 家页：场景（天光/灯窗）与卡片 */
+  --scene-sun: rgba(255, 244, 214, .85);
+  --scene-glow: rgba(255, 224, 190, .50);
+  --scene-win-1: rgba(255, 190, 200, .80);
+  --scene-win-2: rgba(255, 214, 170, .85);
+  --scene-win-3: rgba(255, 224, 150, .80);
+  --bubble-shadow-me: rgba(60, 30, 80, .18);
+  --cal-today: rgba(157, 131, 255, .28);
+  --cal-today-line: rgba(190, 170, 255, .60);
+  --dp-mask: rgba(10, 6, 24, .50);
+  --dp-ink: #f2ecff;
+  --habit-1-bg: rgba(255, 150, 120, .22); --habit-1-ink: #ffc0a8;
+  --habit-2-bg: rgba(120, 220, 170, .18); --habit-2-bg-2: rgba(120, 220, 170, .20);
+  --habit-3-bg: rgba(255, 210, 140, .20);
+  --habit-4-bg: rgba(255, 140, 140, .18); --habit-4-ink: #ffb0b0;
+  /* ---------- 出生页/设置页/快捷条/对话页/出镜模式的最后一族 ---------- */
+  /* 白与黑的其余档（星空点、渐变端点、投影） */
+  --w-02: rgba(255, 255, 255, .02);
+  --w-30: rgba(255, 255, 255, .30);
+  --w-40: rgba(255, 255, 255, .40);
+  --w-78: rgba(255, 255, 255, .78);
+  --w-90: rgba(255, 255, 255, .90);
+  --w-50: rgba(255, 255, 255, .50);
+  --w-70: rgba(255, 255, 255, .70);
+  --w-045: rgba(255, 255, 255, .045);
+  --scrim-70: rgba(0, 0, 0, .70);
+  --scrim-22: rgba(0, 0, 0, .22);
+  /* 出生页（整页是一张紫色场景卡，色值自成一族） */
+  --birth-bg-1: #0e0c1d; --birth-bg-2: #1a1533; --birth-glow: #241b45;
+  --birth-violet-2: #6a55c9; --birth-violet-3: #cdb8ff; --birth-violet-4: #a48ce8;
+  --birth-ink: #f0ebff; --birth-dim: #9f95cd;
+  --birth-ink-2: #b6add8; --birth-ink-3: #d6ccf8; --birth-ink-4: #8d80c0; --birth-ink-5: #d8d2f0;
+  --birth-glass-shadow: rgba(8, 4, 22, .45);
+  --birth-star-glow: rgba(168, 139, 255, .50);
+  --birth-star-ring: rgba(190, 170, 255, .22);
+  --birth-btn-1: #8a6fd8; --birth-btn-2: #6a4fc0;
+  --birth-btn-shadow: rgba(106, 85, 201, .40);
+  /* 成功/失败在半透明底上的几档（出生页连通性提示、设置页标签） */
+  --ok-a10: rgba(127, 216, 164, .10);
+  --ok-a16b: rgba(90, 169, 124, .16);
+  --ok-a20: rgba(127, 216, 164, .20);
+  --ok-a22: rgba(127, 216, 164, .22);
+  --ok-a30: rgba(90, 169, 124, .30);
+  --ok-a35: rgba(90, 169, 124, .35);
+  --ok-a45: rgba(127, 216, 164, .45);
+  --ok-a50: rgba(127, 216, 164, .50);
+  --ok-a80: rgba(127, 216, 164, .80);
+  --ok-soft: #8FCFAA;
+  --err-soft-2: #ff9a9a;
+  --bad-ink: #ff9d8c; --bad-a50: rgba(255, 157, 140, .50);
+  --rose-a07: rgba(201, 123, 123, .07);
+  --rose-a22: rgba(201, 123, 123, .22);
+  --rose-a45: rgba(201, 123, 123, .45);
+  --rose-ink: #B5605F;
+  /* 设置页：文件类型标签（文档/表格/图片）与图表色板 */
+  --key-ok-ink: #2F7D4F; --key-ok-line: #BFE3CC; --key-ok-bg: #F1FAF4;
+  --doc-ink: #5B6BB5; --doc-a12: rgba(91, 107, 181, .12); --doc-a25: rgba(91, 107, 181, .25);
+  --img-ink: #8A6BB5; --img-a14: rgba(138, 107, 181, .14); --img-a30: rgba(138, 107, 181, .30);
+  --pri-lite: #A88BFF;
+  --pri-a40d: rgba(124, 106, 240, .40);
+  --pri-a06: rgba(124, 106, 240, .06);
+  --pri-a04: rgba(124, 106, 240, .04);
+  --pri-a14b: rgba(124, 106, 240, .14);
+  --pri-a20: rgba(124, 106, 240, .20);
+  --pri-a30b: rgba(124, 106, 240, .30);
+  --pri-a45b: rgba(124, 106, 240, .45);
+  --pri-lite-a28: rgba(168, 139, 255, .28);
+  --pri-lite-a40: rgba(168, 139, 255, .40);
+  --pri-lite-a20b: rgba(180, 158, 255, .20);
+  --pri-lite-a50: rgba(180, 158, 255, .50);
+  /* 快捷条 / 出镜模式 */
+  --quick-ink: #EDE6FF; --quick-caret: #B9A5FF;
+  --pri-a22b: rgba(139, 111, 224, .22);
+  --pri-a25: rgba(124, 106, 240, .25);
+  --pri-lite-a25: rgba(180, 158, 255, .25);
+  --pri-lite-a30: rgba(180, 158, 255, .30);
+  --pri-lite-a35: rgba(157, 131, 255, .35);
+  --pri-lite-a55: rgba(180, 158, 255, .55);
+  --stage-green: #00b140;
+  --stage-grad-1: #1b1440; --stage-grad-2: #3a2170; --stage-grad-3: #6a3fa8;
+  --stage-night-55: rgba(18, 12, 36, .55);
+  --stage-night-72: rgba(18, 12, 36, .72);
+  --stage-night-88: rgba(18, 12, 36, .88);
+  --stage-close: rgba(140, 60, 70, .75);
+  /* 线与底 */
+  --line: #EAEAEC;           /* 细线（中性灰，原 #ECEBF3 偏紫）*/
+  --bg: #F7F7F8;             /* 亮底功能屏（纸白 #F7F7F8，原 #F6F5FB 偏紫）*/
+  --card: rgba(255, 255, 255, .92);
+  --card-solid: #FFFFFF;
+  --row: #F8F7FC;            /* 列表行/次级底 */
+
+  /* 主渐变(按钮/选中/进度统一) */
+  --grad: linear-gradient(120deg, #7C6AF0, #A88BFF);
+  --accent: #7C6AF0;
+  --accent-soft: #EFECFE;
+  --glow: rgba(124, 106, 240, .4);
+
+  /* 状态色(Task State 角标/反馈) */
+  --ok: #5AA97C;
+  --warn: #C9973F;
+  --danger: #C97B7B;
+  --muted: #8F8AA3;          /* 原 #B6B1C9 在白卡上几乎看不见 */
+
+  /* 深底警示（birth/index/pet/stage 这类恒深场景；浅色 `--warn` 在上面读不清）。
+     接回 TA 的「密码没有找回」提示要用它 */
+  --warn-on-dark: #FFC9A0;
+  --warn-on-dark-bg: rgba(255, 190, 130, .10);
+  --warn-on-dark-line: rgba(255, 190, 130, .22);
+
+
+  /* 深底面板(左导航/TA 状态卡/快捷宫格,任何主题下都用深玻璃) */
+  --nav: #FFFFFF;                /* 左导航底（原为深玻璃 rgba(24,19,44,.88)）*/
+  --panel: rgba(28, 22, 52, .82);
+
+  /* 场景(暖=主界面/欢迎页;夜=Quick);--scene-dim:暖场景在深色模式下的暮夜压暗层(白字可读性) */
+  --scene-warm: linear-gradient(180deg, #FFD9A8 0%, #F6BCA2 26%, #E3A2B4 52%, #A98BC8 82%, #8D76B8 100%);
+  --scene-night: linear-gradient(180deg, #1D1840 0%, #2C2456 52%, #4A3B74 100%);
+  --scene-dim: 0;
+
+  /* 圆角与阴影（矩形语言 —— 卡片 16→10，输入/瓦片一律 --r-rect，见下方 B 节） */
+  --radius-card: 10px;
+  --radius-input: var(--r-rect);
+  --radius-tile: var(--r-rect);
+  --radius-pill: 999px;
+  --shadow-card: 0 8px 28px rgba(30, 18, 60, .18);
+  --shadow-soft: 0 4px 14px rgba(80, 70, 120, .12);
+  --shadow-pop: 0 12px 34px rgba(60, 30, 80, .25);
+
+  /* ============================================================
+     扩展令牌
+     纪律：本文件是唯一取色入口，页面只引用，不写字面值
+     ============================================================ */
+
+  /* A. 深玻璃家族 —— 导航 / 右栏 / 日程同一族（日历渲染要跟主色调保持一致） */
+  /* 这族原先是**深玻璃**（左右两条栏铺在暖色场景上），
+     场景拆掉之后翻成**纸白**：实白卡 + 细线 + 深字（夜里那套仍由下面的深色块覆写）。
+     ⚠ 名字没改（--glass* / --ink-g*）：改了要动十几个选择器，而"它是什么"由值说了算。 */
+  --glass: #FFFFFF;
+  --glass-2: #FBFBFC;
+  --glass-line: #EAEAEC;
+  --ink-g: #1B1B1F;                            /* 主文字（纸白卡上） */
+  --ink-g2: #6E6E76;                           /* 次文字 */
+  --ink-g3: #9A9AA3;                           /* 弱文字 */
+
+  /* B. 矩形语言 —— 输入/按钮/芯片/导航项一律 6px；卡片 16 → 10px。
+     --radius-pill 只留给「语义圆」：优先级点 / 开关 / 状态胶囊。
+     注意：改 --radius-* 是**全产品生效**（9 页），不是只有 home。 */
+  --r-rect: 6px;
+  /* 同时把上面「圆角与阴影」块里的三个值改成：
+     --radius-card: 10px;  --radius-input: var(--r-rect);  --radius-tile: var(--r-rect); */
+
+  /* C. TA 的情绪（光球颜色 = 心情）
+     注意：这是 **TA 自己的心情**，不是「用户的心情」——
+     后者属于禁记清单（「把用户某天心情不好固化成用户是抑郁的人」），两者不许混。 */
+  --mood-bright: #E7A44E;   /* 亮堂 */
+  --mood-focus:  #7C6AF0;   /* 专注 */
+  --mood-calm:   #5AA97C;   /* 松弛 */
+  --mood-worry:  #C9973F;   /* 有点担心 */
+  --mood-low:    #8B87A0;   /* 低落 */
+  --mood: var(--mood-bright);                  /* 当前心情，由页面覆写 */
+  --orb-core: #FFF3E0;                         /* 情绪条光球的核心暖白（只给光球用） */
+
+  /* D. 待办优先级（4 档；priority=null 时显示「默认」，不是不给标记）
+     上面四档是给**浅底**的；右栏是深玻璃，字要浅色才读得清 →
+     下面这组按既有的 `--warn-on-dark` 先例再出一套 on-glass 版。 */
+  --pri-high: #C97B7B;  --pri-high-bg: rgba(201, 123, 123, .14);
+  --pri-mid:  #C9973F;  --pri-mid-bg:  rgba(201, 151, 63, .14);
+  --pri-low:  #5AA97C;  --pri-low-bg:  rgba(90, 169, 124, .13);
+  --pri-none: var(--muted); --pri-none-bg: rgba(120, 114, 150, .10);
+  --pri-high-g: #FF9E9E; --pri-high-g-bg: rgba(255, 158, 158, .14);
+  --pri-mid-g:  #FFD9A0; --pri-mid-g-bg:  rgba(255, 217, 160, .14);
+  --pri-low-g:  #9FE0C0; --pri-low-g-bg:  rgba(159, 224, 192, .13);
+  --pri-none-g: var(--ink-g3); --pri-none-g-bg: rgba(255, 255, 255, .06);
+  --gold-on-glass: #FFD9A0;    /* 深玻璃上的暖金强调（导航「新的想法」与其「新」标签用） */
+
+  /* E. 文件类型色块（文件芯片用；只分五类，别再无限扩） */
+  --ftype-doc: #4A6BC7;   --ftype-doc-bg: #E8EEFF;    /* md / docx / txt */
+  --ftype-sheet: #3E8A63; --ftype-sheet-bg: #E4F5EC;  /* xlsx / csv */
+  --ftype-pdf: #C06A6A;   --ftype-pdf-bg: #FDECEC;
+  --ftype-img: #7C6AF0;   --ftype-img-bg: #F1EAFF;
+  --ftype-other: #8B87A0; --ftype-other-bg: rgba(139, 135, 160, .12);
+
+  /* F. 直接铺在场景上的文字（随主题走；卡片内文字仍用 --ink*） */
+  --on-scene: #2E2748;
+  --on-scene2: #5C5478;
+  --on-scene-glow: rgba(255, 255, 255, .55);
+
+  /* G. 场景美术（从 home.html 内联样式收敛上来） */
+  --scene-city: rgba(90, 70, 130, .35);
+  --scene-city-far: rgba(120, 95, 165, .28);
+  --scene-flora: linear-gradient(180deg, rgba(122, 158, 110, .55), rgba(88, 120, 88, .75));
+  --scene-flower-warm: rgba(255, 214, 170, .9);
+  --scene-flower-pink: rgba(255, 190, 200, .85);
+  --scene-flower-gold: rgba(255, 224, 150, .85);
+  --scene-glass: #FFFFFF;                       /* 场景没了，改成实白卡（原为场景上的 .62 白玻璃）*/
+  --scene-glass-strong: #EAEAEC;                /* 同上：这族现在当卡片描边/光环用，值改成细线灰（原来 .94 白）*/
+  --scene-hover: rgba(255, 255, 255, .12);     /* 场景上的悬停底 */
+
+  /* H. 恒定浅底上的文字与轻底（输入条 / ＋ 上拉框）
+     这几个底是**实心浅色且不随主题翻转**（深色=框架与日程，浅色=对话与输入），
+     所以文字也不能跟着翻 —— 深色模式下若用 --ink（那时是近白色）会直接看不见。
+     ⚠ 原设计在深色下漏了这一条（`.composer input{color:var(--ink)}` 落白底上），这里补上。
+     别与 F 节 --on-scene 混用：那族是给「会随场景压暗的文字」。 */
+  --ink-on-solid: #2A2440;      /* 实心浅底上的主文字 */
+  --ink2-on-solid: #5C5478;     /* 实心浅底上的次文字 */
+  --ink3-on-solid: #8B87A0;     /* 实心浅底上的弱文字 / 占位 / 图标 */
+  /* 下面四个名字**被引用但从没定义过**——`var()` 无兜底时整条声明在
+     计算值阶段静默失效（颜色直接继承父级，看着"只是有点不对"，不报错、也不易发现）。
+     值都指向既有真源，别在这里另起新色。 */
+  --ink3: var(--ink3-on-solid);            /* approval / artifact / manage / me 的弱提示文字 */
+  --ink-faint: var(--ink3);                /* manage 页同一个东西的另一个名字（历史遗留） */
+  --danger-soft: rgba(201, 123, 123, .13); /* 危险动作的浅底（销毁对话框 / 规则体检 / 源出错）；
+                                              与 --rose-a30 同族不同档 */
+  --bad: var(--danger);                    /* 失败标签的文字色（浅底上） */
+  --accent-veil: rgba(124, 106, 240, .10);   /* 浅底上的紫色轻底（＋ 按钮常态） */
+  --accent-veil-2: rgba(124, 106, 240, .20); /* 浅底上的紫色轻底（悬停/展开态） */
+
+  /* 动效纪律:交互 200~350ms;氛围漂移 ≥8s */
+  --dur-fast: 200ms;
+  --dur: 280ms;
+  --dur-slow: 350ms;
+  --ease: cubic-bezier(.33, .8, .33, 1);
+
+  /* 字体:字号收敛到 6 档——**新代码只许用这 6 档**，别再引入第 7 种。
+     11 / 12.5 / 15 / 17 / 22 / 44；11px 是下限（更小的字看不清，宁可换行）。
+     原有 10.5/11.5/12/13/13.5/14/14.5/16/18/20/24/25/30 等都已按"就近归台阶"收敛过来。 */
+  --font: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  /* **按语言换字体栈**——同一段中文用日文字体渲染，字形是日式写法（"直/骨/今"都不一样），
+     繁体用简体字体同理（"爲/為""裏/裡"这类差异会露出简体字形）。
+     判据挂在 `<html lang>`（`i18n.js` 切语言时会设），所以不用 JS 参与，样式层面就对了。 */
+  --font-zh-Hant: "PingFang TC", "Hiragino Sans CNS", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+  --font-ja: "Hiragino Sans", "Yu Gothic", "Noto Sans JP", "PingFang SC", sans-serif;
+  --font-ko: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", "PingFang SC", sans-serif;
+  --fs-xs: 11px;    /* 角标 / 辅助说明 */
+  --fs-sm: 12.5px;  /* 次要文字 / 小按钮 */
+  --fs-body: 15px;  /* 正文 */
+  --fs-lg: 17px;    /* 小标题 */
+  --fs-xl: 22px;    /* 大标题 / 图标 */
+  --fs-2xl: 44px;   /* 特大数字 / 大图标 */
+}
+
+/* ---------- 1.5 对话阅读面 ----------
+   **浅底深字**：聊天阅读面**与系统深浅无关**，永远是浅底；对比度有硬门槛
+   （正文 ≥4.5:1、次要 ≥3:1；设计目标是 ≥10:1 / ≥5.2:1，实际取更严的那组）。
+   ⚠ 这一组**不进**主题块、也不被深色模式覆盖——"与主题无关"正是它独立成组的原因。 */
+:root {
+  --chat-surface: #FBFAFF;    /* 浅底（渐变最浅端；对比度就按它算） */
+  --chat-tail: #EFEBFA;       /* 浅底（渐变最深端） */
+  --chat-bg: linear-gradient(180deg, #FBFAFF 0%, #F4F1FC 62%, #EFEBFA 100%);
+  --txt-on-chat: #2A2440;     /* 正文：对 --chat-* 对比 ≥10:1 */
+  --txt-on-chat-2: #5C5872;   /* 次要：≥5.2:1 */
+  --chat-line: #E7E3F2;
+  /* 输入条的大圆角框（16px）。它属于"对话阅读面"这一族，
+     与卡片/面板那套 10px 的矩形语言分开。 */
+  --radius-composer: 16px;
+}
+
+/* ---------- 2. 深色模式:三档切换 ----------
+   浅色强制:html[data-theme="light"](基准即浅色,无需覆盖)
+   深色强制:html[data-theme="dark"];跟随:html[data-theme="auto"] 或缺省 */
+html[data-theme="dark"] {
+  --ink: #F0EEFB; --ink2: #9C97B8; --ink-inv: #F7F4FF;
+  --line: rgba(255, 255, 255, .10);
+  --bg: #14101F;
+  --card: rgba(255, 255, 255, .06);
+  --card-solid: #201A33;
+  --row: rgba(255, 255, 255, .07);
+  --accent-soft: rgba(124, 106, 240, .22);
+  --muted: #87829F;
+  --shadow-card: 0 8px 28px rgba(0, 0, 0, .45);
+  --shadow-soft: 0 4px 14px rgba(0, 0, 0, .35);
+  --shadow-pop: 0 12px 34px rgba(0, 0, 0, .55);
+  --scene-dim: .5;
+  /* 深玻璃族与「直接铺在场景上的文字」在深色模式下压得更实 */
+  --nav: rgba(24,19,44,.88); --glass: rgba(26,20,46,.8); --glass-2: rgba(36,28,62,.68); --on-scene:#F1EDFF; --on-scene2:#C6C0E4; --on-scene-glow: rgba(20,12,40,.6);
+    --glass-line: rgba(255,255,255,.13); --ink-g: #F2EEFF; --ink-g2: rgba(242,238,255,.62); --ink-g3: rgba(242,238,255,.4);
+    --scene-glass: rgba(32,26,54,.75); --scene-glass-strong: rgba(255,255,255,.10);
+  /* 待确认色阶在深色下压深（迁移前写在 me.html 的局部变量里） */
+  --pend-bg: rgba(201, 151, 63, .13); --pend-line: rgba(201, 151, 63, .30);
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) {
+    --ink: #F0EEFB; --ink2: #9C97B8; --ink-inv: #F7F4FF;
+    --line: rgba(255, 255, 255, .10);
+    --bg: #14101F;
+    --card: rgba(255, 255, 255, .06);
+    --card-solid: #201A33;
+    --row: rgba(255, 255, 255, .07);
+    --accent-soft: rgba(124, 106, 240, .22);
+    --muted: #87829F;
+    --shadow-card: 0 8px 28px rgba(0, 0, 0, .45);
+    --shadow-soft: 0 4px 14px rgba(0, 0, 0, .35);
+    --shadow-pop: 0 12px 34px rgba(0, 0, 0, .55);
+    --scene-dim: .5;
+    /* 深玻璃族与「直接铺在场景上的文字」在深色模式下压得更实 */
+    --nav: rgba(24,19,44,.88); --glass: rgba(26,20,46,.8); --glass-2: rgba(36,28,62,.68); --on-scene:#F1EDFF; --on-scene2:#C6C0E4; --on-scene-glow: rgba(20,12,40,.6);
+    --glass-line: rgba(255,255,255,.13); --ink-g: #F2EEFF; --ink-g2: rgba(242,238,255,.62); --ink-g3: rgba(242,238,255,.4);
+    --scene-glass: rgba(32,26,54,.75); --scene-glass-strong: rgba(255,255,255,.10);
+    --pend-bg: rgba(201, 151, 63, .13); --pend-line: rgba(201, 151, 63, .30);
+  }
+}
+
+/* ---------- 3. 基础 ---------- */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  /* 语言相关的字体栈（见上面的变量注释）：日/韩/繁各用各的，缺字再由后面的中文兜底 */
+  font-size: var(--fs-body);
+  color: var(--ink);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  overflow: hidden;
+}
+button { font-family: inherit; border: none; background: none; cursor: pointer; color: inherit; }
+input, textarea { font-family: inherit; color: var(--ink); }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 4px; opacity: .4; }
+
+/* 键盘焦点可见（home/manage/me/pet/stage 之前 focus 样式为 0）。
+   只用 `:focus-visible`——**键盘导航（Tab）才画描边，鼠标点击不画**（鼠标用户不受打扰）。
+   带自己焦点样式的控件不叠第二层（.input 系列已有"边框变色 + 柔光"，conv/quick 的输入框同理）。 */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+.input:focus-visible, .r-inp input:focus-visible, .input-row input:focus-visible { outline: none; }
+
+/* ---------- 4. 场景底(暖=主界面/欢迎;夜=Quick;亮=功能屏) ---------- */
+.scene-warm { background: var(--scene-warm); color: #fff; }
+.scene-night { background: var(--scene-night); color: #fff; }
+.lt { background: var(--bg); }
+
+/* ---------- 5. 氛围资产层(程序化 CSS 为基准,插画为可选增强) ----------
+   UI2.atmosphere() 注入:.atmo 载体 + .atmo-aura 紫色光晕(缓慢漂移 ≥8s)+ .atmo-stars 星点;
+   深浅色一套代码(星点/光晕透明度走变量)。插画:页面在 assets 就绪后设
+   html 上 --atmo-img 并加 .has-atmo,缺失时 CSS 兜底不破相。静默氛围,无大面积高亮插画人物。 */
+.atmo { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+.atmo-aura {
+  position: absolute; inset: -20%;
+  background:
+    radial-gradient(46% 34% at 12% -6%, rgba(124, 106, 240, var(--atmo-aura-a, .14)), transparent 62%),
+    radial-gradient(42% 30% at 98% 108%, rgba(168, 139, 255, var(--atmo-aura-a, .11)), transparent 62%);
+  animation: atmo-drift 14s var(--ease) infinite alternate;
+}
+.atmo-stars {
+  position: absolute; inset: 0; opacity: var(--atmo-stars-a, .8);
+  background:
+    radial-gradient(1.6px 1.6px at 8% 12%, rgba(255,255,255,.9), transparent 100%),
+    radial-gradient(1.1px 1.1px at 22% 26%, rgba(255,224,150,.8), transparent 100%),
+    radial-gradient(1.8px 1.8px at 35% 8%, rgba(255,255,255,.85), transparent 100%),
+    radial-gradient(1.1px 1.1px at 48% 18%, rgba(205,190,255,.8), transparent 100%),
+    radial-gradient(1.6px 1.6px at 62% 6%, rgba(255,255,255,.8), transparent 100%),
+    radial-gradient(1.8px 1.8px at 90% 12%, rgba(255,228,160,.75), transparent 100%),
+    radial-gradient(1.2px 1.2px at 94% 40%, rgba(255,255,255,.65), transparent 100%),
+    radial-gradient(1.4px 1.4px at 55% 32%, rgba(255,255,255,.55), transparent 100%),
+    radial-gradient(1.1px 1.1px at 40% 38%, rgba(255,224,150,.55), transparent 100%);
+  animation: atmo-twinkle 9s ease-in-out infinite alternate;
+}
+.lt .atmo-aura { --atmo-aura-a: .10; }            /* 亮底氛围光更收敛 */
+.lt .atmo-stars { --atmo-stars-a: .35; }
+html.has-atmo .atmo-art {                          /* AI 插画增强(可选):有资产才显示 */
+  position: absolute; inset: 0;
+  background-image: var(--atmo-img);
+  background-size: cover; background-position: center;
+  opacity: var(--atmo-img-a, .5);
+}
+@keyframes atmo-drift { from { transform: translate3d(-2%, -1.5%, 0); } to { transform: translate3d(2%, 2%, 0); } }
+@keyframes atmo-twinkle { from { opacity: calc(var(--atmo-stars-a, .8) * .75); } to { opacity: var(--atmo-stars-a, .8); } }
+
+/* ---------- 6. 白卡与布局原语 ---------- */
+.card {
+  background: var(--card);
+  border-radius: var(--radius-card);
+  color: var(--ink);
+  box-shadow: var(--shadow-card);
+}
+.section { padding: 13px 14px; }                    /* SectionCard 内容内衬 */
+.section-t {                                        /* SectionCard 标题行:左题右操作 */
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: var(--fs-sm); font-weight: 600; margin-bottom: 9px;
+}
+.section-t .xtra { font-weight: 400; font-size: var(--fs-xs); color: var(--muted); }
+
+/* ---------- 7. 按钮 ---------- */
+.btn {
+  display: inline-flex; align-items: center; gap: 8px; justify-content: center;
+  padding: 11px 32px; border-radius: var(--radius-pill);
+  font-size: var(--fs-body); letter-spacing: 2px; color: #fff;
+  background: var(--grad); box-shadow: 0 8px 22px var(--glow);
+  transition: transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease), opacity var(--dur-fast);
+}
+.btn:hover { transform: translateY(-1px); box-shadow: 0 10px 26px var(--glow); }
+.btn:active { transform: translateY(0) scale(.98); }
+.btn.sm { padding: 8px 22px; font-size: var(--fs-sm); letter-spacing: 1px; }
+.btn.ghost { background: var(--accent-soft); color: var(--accent); box-shadow: none; }
+.btn.danger { background: var(--danger); box-shadow: 0 8px 22px rgba(201, 123, 123, .35); }
+.btn:disabled { opacity: .45; pointer-events: none; }
+
+/* ---------- 8. 输入 ---------- */
+.input {
+  height: 44px; border-radius: var(--radius-input);
+  background: var(--row); border: 1px solid var(--line);
+  padding: 0 14px; font-size: var(--fs-body); outline: none; width: 100%;
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+}
+.input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+textarea.input { height: auto; padding: 10px 14px; resize: none; }
+.input-pill { border-radius: var(--radius-pill); }   /* 大输入框(Home/Quick) */
+
+/* ---------- 9. 任务卡(TaskCard:时间+图标+人话一句话+状态角标) ---------- */
+.task-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: var(--fs-sm); color: var(--ink); }
+.task-row .tm { color: var(--muted); font-size: var(--fs-xs); width: 34px; flex: none; }
+.task-row .ic { width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12.5px; background: var(--accent-soft); flex: none; }
+.task-row .tx { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 进度条(正在进行) */
+.prog { height: 6px; border-radius: 3px; background: var(--row); overflow: hidden; margin: 7px 0 5px; }
+.prog > i { display: block; height: 100%; width: 0%; background: var(--grad); border-radius: 3px; transition: width var(--dur-slow) var(--ease); }
+
+/* ---------- 10. 状态角标 StatePill(Task State 人话) ---------- */
+.pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 10px; border-radius: var(--radius-pill);
+  font-size: var(--fs-xs); letter-spacing: 1px; line-height: 1.5;
+  background: var(--row); color: var(--ink2);
+}
+.pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+.pill.s-listening, .pill.s-thinking, .pill.s-working { background: var(--accent-soft); color: var(--accent); }
+.pill.s-listening::before, .pill.s-thinking::before, .pill.s-working::before { background: var(--accent); animation: pill-pulse 1.6s ease-in-out infinite; }
+.pill.s-approval { background: rgba(201, 151, 63, .16); color: var(--warn); }
+.pill.s-approval::before { background: var(--warn); animation: pill-pulse 1.6s ease-in-out infinite; }
+.pill.s-success { background: rgba(90, 169, 124, .14); color: var(--ok); }
+.pill.s-success::before { background: var(--ok); }
+.pill.s-error { background: rgba(201, 123, 123, .14); color: var(--danger); }
+.pill.s-error::before { background: var(--danger); }
+@keyframes pill-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+
+/* ---------- 11. 审批卡(ApprovalCard:人话 + 风险等级,不露 tool/ruleId) ---------- */
+.approval { padding: 14px 16px; border-radius: var(--radius-card); background: var(--card); box-shadow: var(--shadow-pop); }
+.approval .a-t { font-size: var(--fs-sm); font-weight: 600; color: var(--ink); display: flex; align-items: center; gap: 8px; }
+.approval .a-t .risk { font-size: var(--fs-xs); font-weight: 400; padding: 2px 9px; border-radius: var(--radius-pill); }
+.approval .a-t .risk.r-high { background: rgba(201, 123, 123, .16); color: var(--danger); }
+.approval .a-t .risk.r-mid { background: rgba(201, 151, 63, .16); color: var(--warn); }
+.approval .a-t .risk.r-low { background: rgba(90, 169, 124, .14); color: var(--ok); }
+.approval .a-sum { font-size: var(--fs-body); color: var(--ink); margin: 9px 0 13px; line-height: 1.6; }
+.approval .a-ops { display: flex; gap: 10px; justify-content: flex-end; }
+/* 审批卡三样：为什么问你 / 影响面 / 叠起来的原始命令。
+   视觉纪律：说明文字用次要色（别抢按钮），原始命令用等宽小字并默认收起。 */
+.approval .a-why { font-size: var(--fs-sm); color: var(--ink2); line-height: 1.75; margin: 6px 0 0; }
+.approval .a-imp { font-size: var(--fs-xs); color: var(--ink3); line-height: 1.7; margin-top: 5px; }
+.approval .a-rawt { margin-top: 8px; padding-left: 0; color: var(--ink3); }
+.approval .a-raw { margin: 6px 0 0; padding: 8px 10px; border-radius: var(--r-rect); background: var(--row);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--fs-xs); color: var(--ink2);
+  white-space: pre-wrap; word-break: break-all; max-height: 120px; overflow: auto; }
+.approval .a-ops.sub { margin-top: 8px; }
+/* 第二行「到这次对话结束都允许」**必须比主按钮安静**：它给的是更宽一档的权限，
+   做得比"就这一次"还显眼，等于用视觉把人往宽的那边推（层级不能替用户做决定）。
+   ⚠ 这个按钮**不能**用 `btn sm line`：`.btn.line` 在 ui.css 里根本不存在，会退回主按钮样式，
+   正好把上面这条纪律做反。 */
+.approval .a-ops.sub .btn {
+  flex: 1; background: none; color: var(--ink2);
+  box-shadow: inset 0 0 0 1px var(--line); letter-spacing: 0;
+}
+.approval .a-ops.sub .btn:hover { background: var(--row); transform: none; box-shadow: inset 0 0 0 1px var(--line); }
+/* 「记下的规矩：…」——点持久授权之前要知道自己签的是什么（盲签才是真危险） */
+.approval .a-rule { font-size: var(--fs-xs); color: var(--ink3); line-height: 1.7; margin-top: 7px;
+  padding: 7px 9px; border-radius: var(--r-rect); background: var(--row); }
+
+/* ---------- 12. 气泡 Message(Home/Pet/Quick 共用) ---------- */
+.msg { display: flex; gap: 9px; margin: 10px 0; align-items: flex-start; animation: rise var(--dur) var(--ease); }
+.msg .m-av { width: 30px; height: 30px; border-radius: 50%; background: var(--grad); flex: none; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 12.5px; }
+.msg .m-bubble {
+  max-width: min(78%, 520px); padding: 9px 13px; border-radius: 14px;
+  font-size: var(--fs-body); line-height: 1.65; color: var(--ink);
+  background: var(--card); box-shadow: var(--shadow-soft);
+  user-select: text;
+}
+/* 空气泡不当"等待中"的展示（等待改由 .ui-pending 状态行负责）——没内容就先别出现。
+   整行一起藏：否则会留下一个孤零零的"灵"头像 */
+.msg .m-bubble:empty { display: none; }
+.msg.ta:has(.m-bubble:empty) { display: none; }
+
+/* 进行中状态行（「正在思考」+「已处理 N 秒」）——安静一行，不占大框 */
+/* 产物面板——右侧滑出，安静一栏 */
+.ui-pv {
+  position: fixed; top: 0; right: 0; bottom: 0; width: 430px; max-width: 48vw;
+  /* 深色底 + 毛玻璃：家页背景是亮色插画，浅底浅字会看不清——
+     用房间那套验证过的深底（rgba(16,11,32,.55) 加深一点），任何背景下都读得清 */
+  background: rgba(16,11,32,.78); backdrop-filter: blur(14px);
+  border-left: 1px solid rgba(180,158,255,.18);
+  box-shadow: -12px 0 34px rgba(0,0,0,.28);
+  transform: translateX(102%); transition: transform .22s ease; z-index: 40;
+  display: flex; flex-direction: column;
+}
+.ui-pv.open { transform: none; }
+.ui-pv .pv-h { display: flex; align-items: center; gap: 6px; padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,.06); }
+.ui-pv .pv-crumb { flex: 1; min-width: 0; display: flex; align-items: center; gap: 3px; overflow: hidden; white-space: nowrap; font-size: 11px; color: rgba(255,255,255,.72); }
+.ui-pv .pv-seg { overflow: hidden; text-overflow: ellipsis; max-width: 62px; flex: none; }
+/* 文件名才是要看的那个：给它更多位置（目录段窄、文件名宽） */
+.ui-pv .pv-seg.file { max-width: 210px; }
+.ui-pv .pv-seg:not(.file) { cursor: pointer; }
+.ui-pv .pv-seg:not(.file):hover { color: #fff; text-decoration: underline; }
+.ui-pv .pv-seg.file { color: #fff; font-weight: 600; }
+.ui-pv .pv-sep { opacity: .5; }
+.ui-pv .pv-tools { display: flex; gap: 4px; flex: none; }
+.ui-pv .pv-b {
+  font: inherit; font-size: 11px; padding: 3px 7px; border-radius: 7px; cursor: pointer; white-space: nowrap;
+  background: rgba(255,255,255,.08); color: rgba(255,255,255,.85); border: 1px solid rgba(255,255,255,.22);
+}
+.ui-pv .pv-b:hover { background: rgba(255,255,255,.18); color: #fff; }
+.ui-pv .pv-x { padding: 3px 7px; }
+/* 命中区扩展：视觉尺寸**故意不变**（23px 的小按钮看着才清爽），
+   可点区域用 ::after 往外撑 9px → 实际 ≥40×40，不用瞄着点。
+   ⚠️ `getBoundingClientRect()` 量的是元素自身盒子，不含 ::after 外扩：
+   用"元素 rect < 32"判定命中区是量不出这个改动的，得用 elementFromPoint 实测。 */
+.ui-pv .pv-b { position: relative; }
+.ui-pv .pv-b::after { content: ''; position: absolute; inset: -9px; }
+/* 紧凑按钮行（gap 4px）里横向只能各撑 2px：撑满间隙、彼此不重叠。
+   撑到 9px 的话左右邻居的 ::after 会互相压住——实测点「源代码」左边 5px 会落到「✕」上（误关面板），
+   那比"命中区小一点"更糟。纵向不受限，照旧 9px。 */
+.ui-pv .pv-tools .pv-b::after { inset: -9px -2px; }
+.ui-pv .pv-body { flex: 1; min-height: 0; }
+.ui-pv .pv-body iframe { width: 100%; height: 100%; border: 0; background: transparent; }
+
+/* 分身干的活（挂名 + 缩进，与她的步骤区分开）。
+   ⚠️ 权重必须写成 `.steps .st-row.sub`：家页自己定义了 `.steps .st-row{padding:…}`（同权重、后加载），
+   否则 padding-left 仍是 0。 */
+.steps .st-row.sub { padding-left: 14px; opacity: .92; }
+.steps .st-row.sub .st-d { opacity: .55; }
+.steps .st-row.sub .st-t { font-size: var(--fs-sm); }
+
+.ui-pending {
+  display: flex; align-items: center; gap: 7px;
+  padding: 6px 2px 8px; font-size: var(--fs-sm); color: var(--ink2); letter-spacing: .2px;
+}
+.ui-pending .pd-dot {
+  width: 6px; height: 6px; border-radius: 50%; flex: none;
+  background: var(--accent);
+  animation: pd-breathe 1.6s ease-in-out infinite;
+}
+.ui-pending.done .pd-dot { animation: none; opacity: .4; }
+@keyframes pd-breathe { 0%, 100% { opacity: .25; transform: scale(.75); } 50% { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .ui-pending .pd-dot { animation: none; opacity: .6; } }
+.msg.me { flex-direction: row-reverse; }
+.msg.me .m-bubble { background: var(--accent); color: #fff; border-top-right-radius: 5px; }
+.msg.ta .m-bubble { border-top-left-radius: 5px; }
+.msg.sys { justify-content: center; }
+.msg.sys .m-bubble { background: none; box-shadow: none; color: var(--ink2); font-size: var(--fs-sm); }
+.msg .m-err { color: var(--danger); }
+/* 系统提示卡：失败 / 中止 / 一般告知**共用这一张**。
+   无头像、不嵌套 —— 此前失败是把整条消息塞进原气泡，于是双头像 + 正文左边缘 61→100px 错位。 */
+.syscard {
+  display: flex; align-items: flex-start; gap: 9px;
+  margin: 10px 0; padding: 9px 12px;
+  border: 1px solid var(--line); border-radius: var(--radius-card);
+  background: var(--row); color: var(--ink); font-size: var(--fs-sm);
+}
+.syscard .sc-i {
+  flex: none; width: 16px; height: 16px; margin-top: 1px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; line-height: 1; color: #fff; background: var(--muted);
+}
+.syscard .sc-b { flex: 1; min-width: 0; }
+.syscard .sc-t { line-height: 1.65; word-break: break-word; }
+.syscard.note { color: var(--ink2); }
+.syscard.ok { border-color: rgba(90, 169, 124, .32); background: rgba(90, 169, 124, .07); }
+.syscard.ok .sc-i { background: var(--ok); }
+.syscard.err { border-color: rgba(201, 123, 123, .38); background: rgba(201, 123, 123, .07); }
+.syscard.err .sc-i { background: var(--danger); }
+.syscard .sc-ops { display: flex; gap: 9px; margin-top: 8px; }
+.syscard .sc-ops button { font-size: var(--fs-xs); color: var(--ink2); padding: 2px 9px; border-radius: 7px;
+  transition: background var(--dur-fast), color var(--dur-fast); }
+.syscard .sc-ops button:hover { background: var(--accent-soft); color: var(--ink); }
+/* 粘进来的截图缩略图 —— 与文件芯片同一行混排。
+   缩略图 44px 方、圆角、可删；图片来源是剪贴板，只当图片渲染。 */
+.at-thumb { position: relative; width: 44px; height: 44px; border-radius: 10px; overflow: hidden;
+  border: 1px solid var(--line); background: var(--row); flex: none; }
+.at-thumb .at-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.at-thumb .at-cap { position: absolute; left: 0; right: 0; bottom: 0; font-size: 9px; text-align: center;
+  color: #fff; background: rgba(20, 14, 40, .62); line-height: 14px; }
+.at-thumb .at-x { position: absolute; top: -6px; right: -6px; width: 17px; height: 17px; border-radius: 50%;
+  background: var(--danger); color: #fff; font-size: 11px; line-height: 15px; text-align: center; cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,.25); }
+.at-thumb .at-x::after { content: ''; position: absolute; inset: -6px; }   /* 命中区撑到 ≥28px */
+
+/* 气泡里的文件芯片行（用户发出去的文件——紫色气泡里挂一排浅色芯片，一眼看出带了什么） */
+.msg .m-files { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.msg .m-files:first-child { margin-top: 0; }
+.msg .m-ops { display: flex; gap: 9px; margin-top: 7px; }
+.msg .m-ops button { font-size: var(--fs-xs); color: var(--ink2); padding: 2px 8px; border-radius: 7px; transition: background var(--dur-fast), color var(--dur-fast); }
+.msg .m-ops button:hover { background: var(--row); color: var(--ink); }
+@keyframes rise { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: none; } }
+
+/* ---------- 12.5 排版渲染（她的回复走 Markdown，见 components.js 的 mdToHtml） ----------
+   纪律：只给"结构"上样式（标题/列表/表格/代码），不加花哨装饰；字号仍走 Token；
+   深色模式下自动跟随（颜色全部来自变量）。 */
+.m-bubble.md { white-space: normal; }
+.m-bubble.md .md-p { margin: 0 0 8px; }
+.m-bubble.md .md-p:last-child { margin-bottom: 0; }
+.m-bubble.md .md-h { font-weight: 600; letter-spacing: .5px; margin: 12px 0 6px; font-size: var(--fs-body); }
+.m-bubble.md .md-h:first-child { margin-top: 0; }
+.m-bubble.md .md-h1 { font-size: calc(var(--fs-body) + 11px); }
+.m-bubble.md .md-h2 { font-size: calc(var(--fs-body) + 11px); }
+.m-bubble.md .md-h3, .m-bubble.md .md-h4 { color: var(--ink); opacity: .92; }
+.m-bubble.md .md-list { margin: 4px 0 8px; padding-left: 20px; }
+.m-bubble.md .md-list li { margin: 3px 0; line-height: 1.7; }
+.m-bubble.md .md-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .92em;
+  background: var(--row); border: 1px solid var(--line); border-radius: 6px; padding: 1px 5px; }
+.m-bubble.md .md-pre { background: var(--row); border: 1px solid var(--line); border-radius: 10px;
+  padding: 9px 11px; margin: 6px 0 9px; overflow-x: auto; }
+.m-bubble.md .md-pre code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; line-height: 1.6; white-space: pre; }
+.m-bubble.md .md-quote { margin: 6px 0 9px; padding: 6px 12px; border-left: 3px solid var(--accent);
+  background: var(--accent-soft); border-radius: 0 8px 8px 0; color: var(--ink2); }
+.m-bubble.md .md-hr { border: none; border-top: 1px solid var(--line); margin: 10px 0; }
+.m-bubble.md .md-tablewrap { overflow-x: auto; margin: 6px 0 9px; }
+/* **窄了就换版式**——表格装不下时转"字段:值"，不硬挤、不截断。
+   做法是"一份内容两种版式 + 容器查询"（渲染时就把两版都写进 DOM，浏览器按气泡宽度自己选）：
+   · 为什么不用 JS 量宽度：量宽要等布局，流式每来一块都得重量一次（贵且会闪）；
+   · 容器查询在流式长出来的过程中自动跟着切，零成本零闪烁。
+   · 4 列以上的表格用更宽的阈值：那种表在窄气泡里本来就挤成一团。
+   ⚠ 阈值是**行宽**：400 / 560，不是气泡宽。 */
+/* ⚠ 容器查询的"容器"必须是**宽度确定**的那个盒子。
+   原先挂在气泡上 → 气泡又是 `.msg`（`display:flex`，见 :380）的子项 → flex 子项的"按内容定宽"被
+   inline-size 包含清零 → 气泡宽度实测 **0px**（只剩 padding），消息竖着一字一行。
+   现在挂到**整行 `.msg`**：行宽由父容器决定（确定），气泡恢复按内容定宽，容器查询照样生效。
+   阈值因此从"气泡宽"变成"行宽"（ta 行比气泡宽约 39px = 头像 30 + 间距 9），下面两条按行宽略放宽。 */
+.msg { container-type: inline-size; }
+.m-bubble.md .md-fields { display: none; flex-direction: column; gap: 5px; margin: 6px 0 9px; }
+.m-bubble.md .md-fields .f { display: flex; gap: 8px; font-size: var(--fs-sm); background: var(--row); border-radius: var(--r-rect); padding: 6px 9px; }
+.m-bubble.md .md-fields .f .k { color: var(--ink2); flex: none; min-width: 42px; }
+.m-bubble.md .md-fields .f .v { color: var(--ink); min-width: 0; }
+/* 可点的小卡片（确认 / 选择 / 打开）。
+   视觉纪律：卡片比正文**收一点**（虚线描边 + 浅底），按钮用 ghost——它是"要不要我做"，
+   不是催你点什么；点了以后走的是同一条对话（＝你说了那句话）。 */
+.m-bubble.md .act-card { margin: 8px 0 4px; padding: 10px 12px; border-radius: var(--radius-card);
+  background: var(--row); box-shadow: inset 0 0 0 1px var(--line); }
+.m-bubble.md .act-card .ac-q { font-size: var(--fs-body); line-height: 1.6; }
+.m-bubble.md .act-card .ac-ops { display: flex; gap: 8px; margin-top: 8px; }
+/* 不认的动作块（外部内容里的 / 写法坏的）原样显示成一段代码——**不给假按钮** */
+.m-bubble.md .md-act-inert { opacity: .7; }
+@container (max-width: 400px) {
+  .m-bubble.md .md-tablewrap { display: none; }
+  .m-bubble.md .md-fields { display: flex; }
+}
+@container (max-width: 560px) {
+  .m-bubble.md .md-tablewrap.wide { display: none; }
+  .m-bubble.md .md-fields.wide { display: flex; }
+}
+.m-bubble.md .md-table { border-collapse: collapse; font-size: var(--fs-sm); min-width: 60%; }
+.m-bubble.md .md-table th, .m-bubble.md .md-table td { border: 1px solid var(--line); padding: 5px 9px; text-align: left; }
+.m-bubble.md .md-table th { background: var(--row); font-weight: 600; }
+.m-bubble.md a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.m-bubble.md strong { font-weight: 600; }
+/* 她的气泡是紫底白字时（.msg.me 不适用；浅色卡上正常），保证代码块在深色模式也读得清 */
+html[data-theme="dark"] .m-bubble.md .md-pre code { color: var(--ink); }
+
+/* ---------- 12.6 过程行（关键节点提示——"她正在读哪个文件/搜什么/改到哪"） ---------- */
+.steps { margin: 6px 0 10px; padding: 8px 12px; border-radius: 12px; background: rgba(255,255,255,.72); border: 1px solid var(--line);
+  font-size: var(--fs-sm); color: var(--ink); line-height: 1.7; backdrop-filter: blur(6px); }
+html[data-theme="dark"] .steps { background: rgba(255,255,255,.10); }
+.steps .st-h { font-size: var(--fs-xs); color: var(--muted); letter-spacing: 1px; margin-bottom: 4px; }
+.steps .st-row { display: flex; align-items: flex-start; gap: 7px; padding: 1px 0; }
+.steps .st-row .st-d { flex: none; width: 14px; text-align: center; }
+.steps .st-row.doing { color: var(--ink); }
+.steps .st-row.done .st-d { color: var(--ok); }
+.steps .st-row.fail .st-d { color: var(--danger); }
+.steps .st-row.fail { color: var(--danger); }
+.steps .st-row .st-t { min-width: 0; overflow-wrap: anywhere; opacity: .92; }
+.steps .st-row.done .st-t, .steps .st-row.fail .st-t { opacity: 1; }
+.steps .st-think { color: #6a5f92; background: var(--accent-soft); border-radius: 9px; padding: 5px 9px; margin-bottom: 6px; line-height: 1.65; }
+
+/* ---------- 12.6b 过程节点流 StepFlow / 结果卡 ResultCard ----------
+   关键节点标注 + 思考过程关键内容实时展示；处理完自动刷成结果，不用手动刷新。
+   底是恒定浅色（她的话与过程都铺在家页场景上），所以文字走 --ink-on-solid 族。 */
+.proc { margin: 8px 0 10px; border-radius: var(--radius-card); padding: 9px 11px 8px; max-width: 560px;
+  background: var(--scene-glass);
+  border: 1px solid var(--line); box-shadow: var(--shadow-soft); color: var(--ink-on-solid); }
+.proc header { display: flex; align-items: center; gap: 8px; font-size: var(--fs-xs); color: var(--ink2-on-solid); margin-bottom: 7px; }
+.proc header b { color: var(--ink-on-solid); font-weight: 600; font-size: var(--fs-sm); }
+.proc .pbar { flex: 1; height: 3px; border-radius: 2px; background: var(--scene-hover); overflow: hidden; max-width: 150px; }
+.proc .pbar i { display: block; height: 100%; width: 0; border-radius: 2px; background: var(--grad); transition: width var(--dur-slow) var(--ease); }
+.proc .st { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-xs); }
+.proc .st .live { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pd-breathe 1.5s ease-in-out infinite; }
+.proc.done .st .live { display: none; }
+.proc .st-list { list-style: none; display: flex; flex-direction: column; gap: 5px; }
+.proc li { display: flex; gap: 8px; font-size: var(--fs-sm); color: var(--ink-on-solid); line-height: 1.5; }
+.proc li .pn { flex: none; width: 15px; text-align: center; color: var(--ok); }
+.proc li.now .pn { color: var(--accent); }
+.proc li.fail .pn, .proc li.fail .pt { color: var(--danger); }
+.proc li .pt { min-width: 0; overflow-wrap: anywhere; }
+.proc li .tm2 { margin-left: auto; font-size: var(--fs-xs); color: var(--ink2-on-solid); flex: none; padding-left: 8px; }
+.proc li.sub { padding-left: 13px; }
+.proc li.sub .pn { opacity: .55; }
+.proc li.sub .pt { font-size: var(--fs-xs); color: var(--ink2-on-solid); }
+.proc .think { margin: 4px 0 2px 23px; padding: 5px 9px; border-radius: var(--r-rect); font-size: var(--fs-xs);
+  color: var(--ink2-on-solid); background: var(--accent-veil); border-left: 2px solid var(--accent); line-height: 1.6; }
+.proc .st-more { font-size: var(--fs-xs); color: var(--accent); margin-bottom: 6px; cursor: pointer; }
+.proc.folded .st-list, .proc.folded .think { display: none; }
+/* 结果卡：绿色 ✓ 头 + 逐条 + 动作（动作按钮由页面给，组件不接 IPC） */
+.result { margin: 8px 0 10px; border-radius: var(--radius-card); overflow: hidden; max-width: 520px;
+  background: var(--scene-glass-strong); border: 1px solid var(--scene-glass-strong); box-shadow: var(--shadow-soft); color: var(--ink-on-solid); }
+.result .rh { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: rgba(90, 169, 124, .14);
+  font-size: var(--fs-sm); color: var(--ok); font-weight: 600; }
+.result.bad .rh { background: rgba(201, 123, 123, .14); color: var(--danger); }
+.result .rh .ok, .result .rh .no { width: 16px; height: 16px; border-radius: 50%; background: var(--ok); color: #fff;
+  display: inline-flex; align-items: center; justify-content: center; font-size: 11px; flex: none; }
+.result.bad .rh .no { background: var(--danger); }
+.result .rb { padding: 9px 12px; font-size: var(--fs-sm); line-height: 1.75; display: flex; flex-direction: column; gap: 3px; }
+.result .rb .li { display: flex; gap: 8px; }
+.result .rb .li > span:first-child { color: var(--warn); font-weight: 600; flex: none; }
+.result .rb .li.fail > span:first-child { color: var(--danger); }
+.result .rb .rn { margin-top: 6px; font-size: var(--fs-xs); color: var(--ink2-on-solid); }
+.result .acts { display: flex; gap: 7px; padding: 0 12px 11px; flex-wrap: wrap; }
+.result .acts button { font-size: var(--fs-xs); padding: 5px 11px; border-radius: var(--r-rect);
+  background: var(--accent-veil); color: var(--accent); font-weight: 600; transition: background var(--dur-fast) var(--ease); }
+.result .acts button:hover { background: var(--accent-veil-2); }
+.result .acts button.pri { background: var(--grad); color: #fff; }
+/* 结果卡里的任务控件（从右栏工作台搬来，删卡、保能力） */
+.result .wb-ops { padding: 0 12px 11px; font-size: var(--fs-sm); color: var(--ink-on-solid); }
+
+/* ---------- 12.7 工作台卡（任务名/进度/步骤/控制） ---------- */
+.wb-task { background: var(--row); border-radius: 10px; padding: 8px 10px; margin-bottom: 7px; }
+.wb-name { font-size: var(--fs-sm); font-weight: 600; color: var(--ink); line-height: 1.5; }
+.wb-sub { font-size: var(--fs-xs); color: var(--ink2); margin-top: 3px; line-height: 1.6; }
+.wb-meta { display: flex; justify-content: space-between; font-size: var(--fs-xs); color: var(--ink2); margin-top: 2px; }
+.ops { display: flex; gap: 6px; flex-wrap: wrap; }
+.op { font-size: var(--fs-xs); padding: 4px 11px; border-radius: var(--radius-pill); background: var(--grad); color: #fff;
+  border: none; cursor: pointer; box-shadow: 0 2px 8px var(--glow); transition: transform var(--dur-fast) var(--ease); }
+.op:hover { transform: translateY(-1px); }
+.op.plain { background: var(--row); color: var(--ink2); box-shadow: none; }
+
+/* ---------- 13. 开关 Toggle / 分段选择 ---------- */
+.sw { width: 36px; height: 20px; border-radius: 10px; background: var(--grad); position: relative; flex: none; cursor: pointer; transition: background var(--dur-fast); border: none; }
+.sw::after { content: ""; position: absolute; right: 2px; top: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform var(--dur-fast) var(--ease); }
+.sw.off { background: #E3E2EF; }
+html[data-theme="dark"] .sw.off { background: rgba(255, 255, 255, .16); }
+.sw.off::after { transform: translateX(-16px); }
+@media (prefers-color-scheme: dark) { html:not([data-theme="light"]) .sw.off { background: rgba(255,255,255,.16); } }
+
+/* ---------- 14. Chip / 宫格 QuickTile ---------- */
+.chip { padding: 7px 18px; border-radius: var(--radius-pill); font-size: var(--fs-sm); color: var(--ink2); background: var(--row); cursor: pointer; transition: background var(--dur-fast), color var(--dur-fast); }
+.chip.on { color: #fff; background: var(--grad); }
+.qgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.qtile {
+  background: var(--panel); backdrop-filter: blur(10px); color: rgba(255, 255, 255, .88);
+  border-radius: var(--radius-tile); padding: 11px 4px; text-align: center;
+  font-size: var(--fs-xs); cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease), background var(--dur-fast);
+}
+.qtile .em { font-size: 15px; display: block; margin-bottom: 4px; }
+.qtile:hover { transform: translateY(-2px); background: rgba(40, 32, 70, .9); }
+
+/* ---------- 14.5 文件芯片 FileChip（组件在 components.js） ----------
+   不显示路径，用类型色块标注文件类型（输入框同理）。
+   底色是恒定的浅玻璃（消息里可能落在紫色气泡上，也可能落在场景上），所以文字走 --ink-on-solid 族。 */
+.fchip {
+  display: inline-flex; align-items: center; gap: 9px; padding: 6px 10px 6px 7px;
+  border-radius: var(--r-rect); background: var(--scene-glass-strong);
+  border: 1px solid var(--line); box-shadow: var(--shadow-soft);
+  color: var(--ink-on-solid); max-width: 100%; vertical-align: top;
+}
+.fchip.f-clickable { cursor: pointer; transition: transform var(--dur-fast) var(--ease); }
+.fchip.f-clickable:hover { transform: translateY(-1px); }
+.fchip .fi {                                   /* 类型色块：里面写扩展名，不画图标（一眼认类型） */
+  min-width: 28px; height: 28px; padding: 0 5px; border-radius: var(--r-rect); flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: var(--fs-xs); font-weight: 700; letter-spacing: .3px;
+}
+.fchip .fx { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.fchip .fx b { font-size: var(--fs-sm); font-weight: 600; color: var(--ink-on-solid);
+  max-width: 230px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fchip .fx i { font-style: normal; font-size: var(--fs-xs); color: var(--ink2-on-solid); }
+.fchip .fv { font-size: var(--fs-xs); color: var(--accent); flex: none; padding-left: 9px; border-left: 1px solid var(--line); }
+.fchip .fx-x {                                   /* 只出现在「还没发出去」的芯片上（把附错的文件拿下来） */
+  font-size: var(--fs-xs); color: var(--ink3-on-solid); flex: none; padding: 2px 4px; border-radius: 4px;
+  position: relative; transition: background var(--dur-fast), color var(--dur-fast);
+}
+/* 命中区外扩（视觉尺寸故意不变，同 `.ui-pv .pv-b` 的做法）。
+   横向只往外 4px：芯片是 flex-wrap 的，横向多撑会压到隔壁芯片的点击（那是"打开文件"）。
+   宁可比 40 小一点，也不要把邻居的点击抢过来（同 `.pv-tools` 的取舍）。 */
+.fchip .fx-x::after { content: ''; position: absolute; inset: -9px -4px; }
+.fchip .fx-x:hover { background: var(--accent-veil); color: var(--danger); }
+/* 五类色块（E 族令牌，别在页面里另写颜色） */
+.f-doc .fi { background: var(--ftype-doc-bg); color: var(--ftype-doc); }
+.f-sheet .fi { background: var(--ftype-sheet-bg); color: var(--ftype-sheet); }
+.f-pdf .fi { background: var(--ftype-pdf-bg); color: var(--ftype-pdf); }
+.f-img .fi { background: var(--ftype-img-bg); color: var(--ftype-img); }
+.f-other .fi { background: var(--ftype-other-bg); color: var(--ftype-other); }
+
+/* ---------- 15. 空态 EmptyState ---------- */
+.empty { text-align: center; padding: 34px 16px; color: var(--ink2); }
+.empty .e-ic { font-size: 44px; margin-bottom: 10px; }
+.empty .e-t { font-size: var(--fs-body); color: var(--ink); margin-bottom: 5px; }
+.empty .e-d { font-size: var(--fs-sm); line-height: 1.7; }
+
+/* ---------- 16. 弹窗 Modal / 轻提示 Toast ---------- */
+.mask {
+  position: fixed; inset: 0; background: rgba(16, 12, 36, .55); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center; z-index: 90;
+  animation: fade var(--dur) var(--ease);
+}
+.modal { width: min(460px, 86vw); padding: 22px 24px; animation: rise var(--dur) var(--ease); }
+.modal .mo-t { font-size: 17px; font-weight: 600; letter-spacing: 1px; margin-bottom: 12px; }
+.modal .mo-b { font-size: var(--fs-body); color: var(--ink); line-height: 1.7; }
+.modal .mo-ops { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+.toast {
+  position: fixed; left: 50%; bottom: 34px; transform: translateX(-50%);
+  padding: 9px 20px; border-radius: var(--radius-pill); font-size: var(--fs-sm);
+  background: var(--panel); color: #fff; box-shadow: var(--shadow-pop); z-index: 99;
+  /* 提示条是**纯通知**：它落在底部正中，正好压在输入条中段（z-index 99 > 输入条的 6），
+     于是提示还在的那两秒里，输入条中间点不动。谁都不需要点它 → 让它不吃点击。 */
+  pointer-events: none;
+  animation: rise var(--dur) var(--ease);
+}
+.toast.ok { background: var(--ok); }
+.toast.err { background: var(--danger); }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* ---------- 17. 侧导航(Home 左栏,任何窗口尺寸不挤坏) ----------
+   顶端「灵核」二字 → **星形图标（图标即回家键）**；
+   导航项 8 → **6**（删首页/聊天/屏幕理解，「我的 TA」→「个性化」，新增「新的想法」）；
+   底部用户胶囊 → `mechip` + 点开的人物卡 `mepop`（点名字要能点开）。 */
+.snav { position: absolute; top: 0; bottom: 0; left: 0; width: 168px; background: var(--nav); backdrop-filter: blur(16px);
+  border-right: 1px solid var(--glass-line); z-index: 8; padding: 16px 12px 14px;
+  display: flex; flex-direction: column; align-items: center; color: var(--ink-g); }
+/* 品牌星形（左导航顶上那颗 / 个性化页标题那颗）——填充色收到这里，
+   页面只写 class、不写字面值（色值棘轮挡着，而且本来就该单一来源） */
+.star-ico svg path, .star-ico svg circle { fill: var(--ink-inv); }
+.star-ico svg circle { opacity: .55; }
+.nav-brand { width: 38px; height: 38px; border-radius: 11px; background: var(--grad); display: flex;
+  align-items: center; justify-content: center; box-shadow: 0 6px 18px var(--glow); margin-bottom: 6px;
+  position: relative; cursor: pointer; flex: none; }
+.nav-brand::after { content: ""; position: absolute; left: 50%; bottom: -9px; transform: translateX(-50%);
+  width: 14px; height: 2px; border-radius: 2px; background: var(--accent); }
+.nits { display: flex; flex-direction: column; gap: 2px; width: 100%; margin-top: 16px; }
+.nit { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 11px; border-radius: var(--r-rect);
+  font-size: var(--fs-sm); color: var(--ink-g2); letter-spacing: .5px; cursor: pointer; text-align: left;
+  border: none; background: none; transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+.nit svg { flex: none; opacity: .85; }
+.nit:hover { background: var(--scene-hover); color: var(--ink-g); }
+.nit.on { background: var(--grad); color: #fff; box-shadow: 0 6px 16px var(--glow); }
+.nit.on svg { opacity: 1; }
+.nit.new { color: var(--gold-on-glass); }
+.nit.new svg { opacity: 1; }
+.nit .tag { margin-left: auto; font-size: var(--fs-xs); color: var(--gold-on-glass);
+  background: rgba(255, 217, 160, .14); padding: 1px 5px; border-radius: var(--r-rect); }
+.mechip { margin-top: auto; width: 100%; display: flex; align-items: center; gap: 9px; padding: 7px 9px;
+  border-radius: var(--r-rect); background: rgba(255, 255, 255, .06); cursor: pointer;
+  transition: background var(--dur) var(--ease); }
+.mechip:hover { background: var(--scene-hover); }
+.mechip .av { width: 22px; height: 22px; border-radius: 50%; flex: none;
+  background: radial-gradient(circle at 38% 32%, var(--orb-core), var(--accent) 74%); box-shadow: 0 0 10px var(--glow); }
+.mechip .nm { font-size: var(--fs-sm); color: var(--ink-g); flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mechip .cv { opacity: 0; transition: opacity var(--dur) var(--ease); flex: none; }
+.mechip:hover .cv { opacity: .7; }
+/* 人物卡（点名字出来；点击需要响应，不能点名字啥也没有） */
+.mepop { position: absolute; left: 12px; bottom: 58px; width: 228px; padding: 12px 13px;
+  border-radius: var(--radius-card); background: var(--glass); backdrop-filter: blur(18px);
+  border: 1px solid var(--glass-line); box-shadow: var(--shadow-pop); color: var(--ink-g);
+  display: none; z-index: 20; text-align: left; }
+.mepop.on { display: block; animation: rise var(--dur) var(--ease); }
+.mepop h5 { font-size: var(--fs-sm); font-weight: 600; display: flex; align-items: center; gap: 6px; margin-bottom: 9px; }
+.mepop h5 i { font-style: normal; font-size: var(--fs-xs); color: var(--ink-g3); font-weight: 400; margin-left: auto; }
+.mepop .r { display: flex; align-items: center; gap: 8px; padding: 6px 7px; border-radius: var(--r-rect);
+  font-size: var(--fs-xs); color: var(--ink-g2); cursor: pointer; }
+.mepop .r:hover { background: rgba(255, 255, 255, .09); color: var(--ink-g); }
+.mepop .r b { color: var(--ink-g); font-weight: 600; flex: none; }
+.mepop .hr { height: 1px; background: var(--glass-line); margin: 8px 0; }
+
+/* ---------- 18. 出现/收起纪律(全产品共用;页面不再自定义花哨动画) ---------- */
+.anim-in { animation: rise var(--dur) var(--ease); }
+.anim-fade { animation: fade var(--dur) var(--ease); }
+.anim-pop { animation: pop var(--dur-slow) var(--ease); }
+@keyframes pop { 0% { opacity: 0; transform: scale(.92); } 60% { transform: scale(1.02); } 100% { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
+/* ---------- 19. 呼吸( Live2D 容器兜底/头像可复用) ---------- */
+.breathe { animation: breathe 4.5s ease-in-out infinite; }
+@keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03); } }
+
+/* 「这次的产出」卡——她做出来的东西有账、点得开。
+   视觉纪律：比正文**收一点**（虚线描边 + 浅底），跟动作卡同一族；不做"删掉这条"（删要回文件页）。 */
+.artifact-card { margin: 10px 0 4px; padding: 10px 12px; border-radius: var(--radius-card);
+  background: var(--row); box-shadow: inset 0 0 0 1px var(--line);
+  /* 窄窗纪律：卡片挂在**对话列**上整行铺开（不塞进气泡行里跟正文抢宽度），
+     按钮一律不许压缩（否则「在文件夹里显示」会竖着排成一列字）。 */
+  width: 100%; max-width: 100%; min-width: 0; }
+.artifact-card .ac-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin-bottom: 6px; }
+.artifact-card .ac-title { font-weight: 600; font-size: var(--fs-sm); }
+.artifact-card .ac-note { color: var(--ink2); font-size: var(--fs-xs); }
+.artifact-card .ac-count { margin-left: auto; color: var(--ink3); font-size: var(--fs-xs); }
+.artifact-card .ac-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 5px 0; }
+.artifact-card .ac-kind { flex: none; font-size: var(--fs-xs); color: var(--ink2);
+  background: var(--card, #fff); border-radius: 6px; padding: 1px 6px; box-shadow: inset 0 0 0 1px var(--line); }
+.artifact-card .ac-name { flex: 1 1 8em; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; font-size: var(--fs-sm); }
+.artifact-card .ac-row .btn { flex: none; white-space: nowrap; }
+.artifact-card .ac-open { margin-left: auto; }
+
+/* ===== 标记（标签/书签）—— 家页与对话房间共用（UI2.LabelKit） =====
+   悬浮才露头的按钮（跟「回到这句重说」同一套手感）；**标上了就一直看得见**——标签就是给你回头找的。 */
+.msg .label-btn { opacity: 0; transition: opacity .12s; display: inline-flex; align-items: center; gap: 4px;
+  margin: 4px 2px 0 6px; font: inherit; font-size: 11.5px; color: var(--ink2); background: none; border: 0;
+  padding: 2px 6px; border-radius: 999px; cursor: pointer; }
+.msg:hover .label-btn, .msg:focus-within .label-btn { opacity: 1; }
+.msg.labeled .label-btn { opacity: 1; }
+.label-btn:hover { background: var(--row); color: var(--ink); }
+.label-chip { display: inline-flex; align-items: center; gap: 4px; margin: 4px 0 0; padding: 1px 9px;
+  border-radius: 999px; font-size: 11.5px; color: var(--ink2); border: 1px dashed var(--line);
+  background: var(--accent-soft); cursor: pointer; }
+.label-chip:hover { color: var(--ink); }
+.msg.me .label-chip { margin-left: auto; }
+.msg.label-flash .m-bubble { animation: labelFlash 1.1s var(--ease); }
+@keyframes labelFlash { 0%, 60% { box-shadow: 0 0 0 3px var(--accent-soft); } 100% { box-shadow: none; } }
+.label-nav-row { display: block; width: 100%; text-align: left; font: inherit; cursor: pointer;
+  background: none; border: 0; border-bottom: 1px solid var(--line); padding: 8px 2px; color: var(--ink); }
+.label-nav-row:last-child { border-bottom: 0; }
+.label-nav-row:hover { background: var(--row); }
+.label-nav-row .lr-tag { font-size: 11.5px; color: var(--accent); }
+.label-nav-row .lr-txt { font-size: 12.5px; color: var(--ink2); display: block; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+
+/* 产物卡的脚（撤销这次改动）——与行分开，它是"整批动作"不是"某一件" */
+.artifact-card .ac-foot { display: flex; justify-content: flex-end; padding: 6px 2px 0; border-top: 1px solid var(--line); margin-top: 8px; }
+
+/* `<html lang>` 跟着界面语言走 → 字体栈跟着换。
+   放在文件末尾，权重与前面的 `var(--font)` 相同但更具体（带属性选择器），所以能覆盖。 */
+html[lang="zh-Hant"], html[lang="zh-Hant"] body { font-family: var(--font-zh-Hant); }
+html[lang="ja"], html[lang="ja"] body { font-family: var(--font-ja); }
+html[lang="ko"], html[lang="ko"] body { font-family: var(--font-ko); }
+html[lang="en"], html[lang="en"] body { font-family: -apple-system, "Segoe UI", system-ui, sans-serif; }

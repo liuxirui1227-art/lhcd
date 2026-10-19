@@ -1,0 +1,1022 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title data-i18n="birth.page.1">灵核 · 出生</title>
+  <link rel="stylesheet" href="./overlay-tokens.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg1: var(--birth-bg-1); --bg2: var(--birth-bg-2);
+      --card: var(--w-05); --line: var(--w-10);
+      --violet: var(--violet); --violet2: var(--birth-violet-2); --text: var(--birth-ink); --dim: var(--birth-dim);
+      /* 掩膜的不透明端：不是设计色，取什么值观感一样（掩膜只认透明/不透明）。
+         这里用颜色关键字而不是十六进制写法，避免给本页平添字面量色值。 */
+      --mask-opaque: black;
+      /* 本页色值统一由 overlay-tokens.css 供给，页面别处不再散写。
+         ⚠ 不要在这里写 `--white: var(--white)` 这类自我引用：本页不引 ui.css，
+           一旦 token 失效，整页场景色、卡片底、按钮都会失效。 */
+      --violet3: var(--birth-violet-3);                       /* 字标渐变/星标/主句高亮共用的浅紫 */
+      --glass-shadow: var(--birth-glass-shadow);      /* 玻璃容器投影 */
+      --star-glow: var(--birth-star-glow);     /* 星标外发光 */
+      --star-ring: var(--birth-star-ring);    /* 星标细环 */
+    }
+    /* 键盘焦点可见：本页不引 ui.css，先就地声明；接入 ui.css 后删掉这条 */
+    :focus-visible { outline: 2px solid var(--violet); outline-offset: 2px; border-radius: 6px; }
+    html, body { height: 100%; }
+    body {
+      font-family: "Hiragino Sans GB", "PingFang SC", sans-serif;
+      color: var(--text); overflow: hidden;
+      background:
+        radial-gradient(1.5px 1.5px at 15% 25%, var(--w-70), transparent 100%),
+        radial-gradient(1px 1px at 30% 70%, var(--w-50), transparent 100%),
+        radial-gradient(1.5px 1.5px at 50% 15%, var(--w-60), transparent 100%),
+        radial-gradient(1px 1px at 72% 55%, var(--w-45), transparent 100%),
+        radial-gradient(1.5px 1.5px at 88% 20%, var(--w-65), transparent 100%),
+        radial-gradient(1px 1px at 8% 85%, var(--w-40), transparent 100%),
+        radial-gradient(120% 90% at 50% -20%, var(--birth-glow) 0%, transparent 55%),
+        linear-gradient(180deg, var(--bg1) 0%, var(--bg2) 100%);
+    }
+    main { height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+    .screen { display: none; flex-direction: column; align-items: center; justify-content: center; width: 100%; max-width: 1080px; height: 100%; overflow: hidden; }
+    .screen.active { display: flex; }
+    .hidden { display: none !important; }
+    button {
+      font: inherit; cursor: pointer; border: none; border-radius: 999px;
+      background: linear-gradient(120deg, var(--violet2), var(--violet));
+      color: var(--white); font-weight: 700; padding: 12px 34px; font-size: 15px;
+      box-shadow: 0 10px 26px var(--birth-btn-shadow); transition: transform .15s, opacity .15s;
+    }
+    button:hover { transform: translateY(-2px); }
+    button:disabled { opacity: .45; cursor: default; transform: none; }
+    button.ghost { background: var(--card); border: 1px solid var(--line); color: var(--text); box-shadow: none; }
+    .err { color: var(--err-soft-2); font-size: 12.5px; min-height: 20px; margin-top: 12px; text-align: center; }
+
+    /* ---------- 欢迎屏（Live2D 实时渲染，无兜底光球） ---------- */
+    .welcome-canvas-wrap {
+      position: relative; width: min(46vw, 480px); height: min(56vh, 540px);
+      margin-top: 0.5vh; flex: 0 1 auto; min-height: 180px;
+    }
+    .welcome-canvas-wrap canvas {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+    }
+    /* 兜底不用 data/models/*.png（占位图里烧进了「换上「X」啦」的 toast，加载期会闪出莫名提示）。
+       换成一圈柔光，真 Live2D 一到位就盖在它上面。 */
+    .welcome-canvas-wrap .welcome-fallback {
+      position: absolute; left: 50%; top: 50%; width: 190px; height: 190px;
+      transform: translate(-50%, -50%); border-radius: 50%;
+      background: radial-gradient(circle at 46% 40%, var(--pri-a30), transparent 72%);
+      /* ⚠ 必须用自带 translate(-50%,-50%) 的呼吸动画：wfloat 的关键帧只写 translateY，
+         会把上面的居中位移覆盖掉（光斑会跑到右下 +95,+95） */
+      animation: wbreathe 5.5s ease-in-out infinite;
+    }
+    @keyframes wbreathe {
+      0%, 100% { transform: translate(-50%, -50%) scale(1); }
+      50% { transform: translate(-50%, -50%) scale(1.06); }
+    }
+    @keyframes wfloat {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-7px); }
+    }
+    /* ---- 四样（字标/主句/按钮/底部入口）收进一块玻璃，不再是散排 ---- */
+    .welcome-panel {
+      width: min(560px, 84vw); margin-top: 2.2vh; padding: 26px 30px 22px;
+      border-radius: 18px; text-align: center;
+      background: var(--card); border: 1px solid var(--line);
+      backdrop-filter: blur(18px) saturate(1.2); -webkit-backdrop-filter: blur(18px) saturate(1.2);
+      box-shadow: 0 18px 50px var(--glass-shadow), inset 0 1px 0 var(--line);
+    }
+    /* logo 与字标 = **一个整体（lockup）**：星在上、字在下、同一条中轴
+       （不是"图标 + 标题"两件东西） */
+    .lockup { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+    .mark { position: relative; width: 46px; height: 46px; display: grid; place-items: center; }
+    .mark .glow { position: absolute; inset: -14px; border-radius: 50%;
+      background: radial-gradient(circle, var(--star-glow), transparent 68%); }
+    .mark .ring { position: absolute; inset: 1px; border-radius: 50%; border: 1px solid var(--star-ring); }
+    .mark svg { position: relative; display: block; }
+    .mark .mini { position: absolute; top: -3px; right: -4px; width: 11px; height: 11px; }
+    /* 填充/渐变走 CSS（presentation 属性里写 var() 不生效） */
+    .mark .star { fill: url(#lh-star); }
+    .mark .star-core { fill: var(--white); }
+    .mark .mini path { fill: var(--white); }
+    .mark .s1 { stop-color: var(--white); }
+    .mark .s2 { stop-color: var(--violet3); }
+    .screen h1 { font-size: 44px; letter-spacing: 8px;
+      background: linear-gradient(120deg, var(--white) 20%, var(--violet3) 55%, var(--birth-violet-4) 80%);
+      -webkit-background-clip: text; background-clip: text; color: transparent; }
+    /* 文案精简为一行（把"是什么"交给画面，"怎么做"交给下一步） */
+    .lead { margin-top: 16px; font-size: 15px; line-height: 1.75; color: var(--text); letter-spacing: .3px; }
+    .lead .hl { color: var(--violet3); font-weight: 600; }
+    .btn-row { margin-top: 22px; display: flex; gap: 16px; justify-content: center; }
+    .hint { margin-top: 30px; font-size: 12.5px; color: var(--ink-soft); }
+
+    /* ---------- 账号屏 ---------- */
+    .card {
+      background: var(--card); border: 1px solid var(--line); border-radius: 22px;
+      padding: 36px 38px; width: 380px; display: flex; flex-direction: column; gap: 14px;
+      margin-top: 8vh;
+    }
+    .card h2 { text-align: center; font-size: 22px; letter-spacing: 3px; margin-bottom: 8px; }
+    /* 导入记忆包那屏的输入框不在 .card 里，把这条现成规则的选择器**扩一下**
+       复用同一套外观（不复制色值，避免多出硬编码色值）。
+       顺带解决字号：不扩的话它掉回 UA 默认 16px。 */
+    .card input, .sigil-step2 input {
+      font: inherit; background: var(--scrim-30); border: 1px solid var(--line); color: var(--text);
+      border-radius: 12px; padding: 12px 16px; font-size: 15px; outline: none;
+    }
+    .card input:focus, .sigil-step2 input:focus { border-color: var(--violet); }
+    .card .switch { text-align: center; font-size: 12.5px; color: var(--dim); cursor: pointer; }
+    /* 欢迎屏底部的次级入口：它不在 .card 里，`.card .switch` 那条选不中它 —— 字号要自己给，
+       否则掉回 UA 默认 16px。 */
+    .welcome-switch { margin-top: 2.4vh; text-align: center; font-size: 12.5px; color: var(--dim); cursor: pointer; }
+    /* ---- 导入记忆包：北极星印记 ----
+       一屏只有三样：圆 → 一句话 → 按钮。圈里没选包时是那颗星，选好包后光弧亮起。 */
+    .sigil-wrap { display: flex; flex-direction: column; align-items: center; text-align: center; }
+    .sigil { position: relative; width: 188px; height: 188px; display: grid; place-items: center; }
+    .sigil .halo { position: absolute; inset: -20px; border-radius: 50%;
+      background: radial-gradient(50% 50% at 50% 50%, var(--card), transparent 66%);
+      animation: sigilBreathe 5.6s cubic-bezier(.33, .8, .33, 1) infinite; }
+    /* 两圈缓转光弧：没选包时不亮（安静），选好包才点亮 —— 那就是"她快回来了"的信号 */
+    .sigil .arcA, .sigil .arcB { position: absolute; border-radius: 50%; opacity: 0; transition: opacity .5s ease; }
+    .sigil .arcA { inset: -7px;
+      background: conic-gradient(from 0deg, transparent 0deg, var(--dim) 70deg, transparent 150deg, transparent 360deg);
+      -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), var(--mask-opaque) calc(100% - 2px));
+      animation: sigilSpin 13s linear infinite; }
+    .sigil .arcB { inset: -17px;
+      background: conic-gradient(from 180deg, transparent 0deg, var(--violet) 60deg, transparent 140deg, transparent 360deg);
+      -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), var(--mask-opaque) calc(100% - 2px));
+      animation: sigilSpin 21s linear infinite reverse; }
+    .sigil.lit .arcA, .sigil.lit .arcB { opacity: 1; }
+    .sigil .rim { position: absolute; inset: 0; border-radius: 50%; transition: box-shadow .5s ease;
+      box-shadow: inset 0 0 0 1px var(--line); }
+    .sigil.lit .rim { box-shadow: inset 0 0 0 1px var(--dim); }
+    .sigil .mark { width: 118px; height: 118px; display: grid; place-items: center;
+      animation: sigilBreathe 5.6s cubic-bezier(.33, .8, .33, 1) infinite; }
+    .sigil .mark svg { display: block; filter: drop-shadow(0 0 20px var(--text)); }
+    .sigil-lead { margin-top: 26px; font-size: 15px; letter-spacing: .5px; color: var(--dim); line-height: 1.7; }
+    .sigil-lead b { color: var(--text); }
+    .sigil-file { margin-top: 6px; font-size: 12.5px; color: var(--dim); word-break: break-all; max-width: 320px; }
+    .sigil-step { display: flex; flex-direction: column; align-items: center; }
+    .sigil-step[hidden] { display: none; }
+    .sigil-btn { margin-top: 22px; display: inline-flex; align-items: center; gap: 9px; }
+    .sigil-step2 input { margin-top: 18px; width: 240px; text-align: center; letter-spacing: 4px; }
+    .sigil-warn { margin-top: 16px; max-width: 340px; font-size: 11px; line-height: 1.7; color: var(--warn-on-dark);
+      background: var(--warn-on-dark-bg); border: 1px solid var(--warn-on-dark-line);
+      border-radius: 6px; padding: 8px 10px; text-align: left; }
+    @keyframes sigilSpin { to { transform: rotate(360deg); } }
+    @keyframes sigilBreathe { 0%, 100% { transform: scale(1); opacity: .88; } 50% { transform: scale(1.04); opacity: 1; } }
+    .card .switch:hover { color: var(--text); }
+    /* 平台服务器（打包版异地登录修复） */
+    .server-toggle {
+      margin-top: 4px; text-align: center; font-size: 12.5px; color: var(--ink-soft); cursor: pointer;
+      border-top: 1px dashed var(--w-08); padding-top: 12px;
+    }
+    .server-toggle:hover { color: var(--dim); }
+    .server-row { display: flex; gap: 8px; }
+    .server-row .srv-input { flex: 1; font-size: 12.5px; padding: 9px 12px; }
+    .server-row .srv-btn {
+      background: var(--w-08); border: 1px solid var(--line); color: var(--text);
+      border-radius: 12px; padding: 0 14px; font-size: 12.5px; cursor: pointer; white-space: nowrap;
+    }
+    .server-row .srv-btn:hover { background: var(--w-15); }
+    .server-hint { font-size: 11px; color: var(--ink-soft); line-height: 1.7; text-align: center; }
+    .server-msg { font-size: 12.5px; text-align: center; color: var(--dim); min-height: 14px; }
+    .server-msg.ok { color: var(--ok-bright); } .server-msg.bad { color: var(--bad-ink); }
+    /* 离线假登录 */
+    .mock-btn {
+      background: var(--ok-a10); border: 1px solid var(--ok-a45); color: var(--ok-bright);
+      border-radius: 12px; padding: 11px 16px; font: inherit; font-size: 12.5px; cursor: pointer;
+      transition: all .15s;
+    }
+    .mock-btn:hover { background: var(--ok-a20); }
+    .mock-tag { text-align: center; font-size: 12.5px; color: var(--ok-bright); }
+
+    /* ---------- 向导屏 ---------- */
+    .wizard-head { display: flex; gap: 10px; align-items: center; margin-top: 3vh; }
+    .wstep { display: flex; align-items: center; gap: 8px; color: var(--ink-soft); font-size: 12.5px; }
+    .wstep .dot {
+      width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      background: var(--w-07); border: 1px solid var(--line); font-weight: 700; font-size: 12.5px;
+    }
+    .wstep.on { color: var(--text); }
+    .wstep.on .dot { background: linear-gradient(120deg, var(--violet2), var(--violet)); border: none; color: var(--white); }
+    .wstep.done .dot { background: var(--pri-a30); }
+    .wizard-body { flex: 1; display: flex; gap: 26px; width: 100%; margin-top: 16px; min-height: 0; }
+    .preview {
+      flex: 1.15; position: relative; border-radius: 26px; overflow: hidden;
+      border: 1px solid var(--line);
+      background:
+        radial-gradient(70% 90% at 50% 112%, var(--pri-a30) 0%, transparent 65%),
+        linear-gradient(180deg, var(--w-045) 0%, var(--w-02) 100%);   /* 2% 白：这一档太淡，不配 token（.02 与 .20 差十倍，收 token 容易看错） */
+    }
+    .preview canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .preview .p-name {
+      position: absolute; top: 14px; left: 0; right: 0; text-align: center;
+      font-size: 12.5px; color: var(--ink-soft-3); letter-spacing: 2px; text-shadow: 0 2px 10px var(--scrim-70);
+    }
+    .preview .p-orb {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+      width: 90px; height: 90px; border-radius: 50%;
+      background: radial-gradient(circle at 42% 38%, var(--white) 0%, var(--violet3) 40%, var(--violet) 100%);
+      box-shadow: 0 0 70px 24px var(--pri-a45);
+    }
+    .panel { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+    .step { display: none; flex-direction: column; flex: 1; overflow-y: auto; }
+    .step.active { display: flex; }
+    .step h3 { font-size: 17px; letter-spacing: 2px; margin: 4px 0 14px; }
+    .step .tip { font-size: 12.5px; color: var(--birth-ink-2); margin-bottom: 14px; line-height: 1.8; }
+
+    /* 形象卡 */
+    .model-grid { display: flex; flex-direction: column; gap: 10px; }
+    .model-card {
+      display: flex; align-items: center; gap: 12px; padding: 13px 16px;
+      background: var(--card); border: 1px solid var(--line); border-radius: 16px; cursor: pointer;
+      transition: border-color .15s, background .15s;
+    }
+    .model-card:hover { border-color: var(--pri-a60); }
+    .model-card.sel { border-color: var(--violet); background: var(--pri-a14); }
+    .model-card .m-avatar {
+      width: 42px; height: 42px; border-radius: 50%; flex: none;
+      background: linear-gradient(140deg, var(--birth-btn-1), var(--birth-btn-2)); color: var(--white);
+      display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 800;
+    }
+    .model-card .m-name { font-weight: 700; font-size: 15px; }
+    .model-card .m-feat { font-size: 12.5px; color: var(--dim); margin-top: 3px; }
+    .model-card .m-check { margin-left: auto; color: var(--violet); font-size: 17px; }
+
+    /* 名字 */
+    .name-input {
+      font: inherit; background: var(--scrim-30); border: 1px solid var(--line); color: var(--text);
+      border-radius: 14px; padding: 14px 18px; font-size: 17px; outline: none; letter-spacing: 2px;
+    }
+    .name-input:focus { border-color: var(--violet); }
+    .name-count { font-size: 12.5px; color: var(--dim); margin-top: 8px; text-align: right; }
+
+    /* 性格卡 */
+    .persona-grid { display: flex; flex-direction: column; gap: 10px; }
+    .persona-card {
+      padding: 14px 16px; background: var(--card); border: 1px solid var(--line);
+      border-radius: 16px; cursor: pointer; transition: border-color .15s, background .15s;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .persona-card:hover { border-color: var(--pri-a60); }
+    .persona-card.sel { border-color: var(--violet); background: var(--pri-a14); }
+    .persona-card .t-label { font-weight: 700; font-size: 15px; flex: none; }
+    .persona-card .t-persona { font-size: 12.5px; color: var(--ink-soft-2); line-height: 1.6; flex: 1; }
+    .persona-card .t-hear { flex: none; font-size: 12.5px; color: var(--violet); cursor: pointer; }
+    .persona-card .t-hear:hover { text-decoration: underline; }
+
+    /* 出生确认 */
+    .confirm { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 20px 22px; line-height: 2.1; font-size: 15px; }
+    .confirm b { color: var(--birth-ink-3); }
+    .birth-btn { margin-top: 22px; font-size: 17px; padding: 15px 40px; align-self: center; }
+    .waiting { margin-top: 18px; text-align: center; font-size: 12.5px; color: var(--dim); line-height: 2; }
+
+    /* ---------- 出生动画 ---------- */
+    .birth-stage { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+    .birth-orb {
+      position: absolute; width: 150px; height: 150px; border-radius: 50%;
+      background: radial-gradient(circle at 42% 38%, var(--white) 0%, var(--violet3) 40%, var(--violet) 100%);
+      box-shadow: 0 0 110px 40px var(--pri-a50);
+      animation: birthpulse 2.2s ease-in-out infinite;
+    }
+    @keyframes birthpulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.18); opacity: .85; } }
+    .birth-canvas-wrap {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      opacity: 0; transform: scale(.85);
+      transition: opacity 1.6s ease, transform 1.6s ease;
+    }
+    .birth-canvas-wrap.reveal { opacity: 1; transform: scale(1); }
+    .birth-canvas-wrap canvas { width: 100%; height: 100%; }
+    .birth-greet {
+      position: absolute; top: 14%; left: 50%; transform: translateX(-50%);
+      background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+      padding: 12px 20px; font-size: 15px; opacity: 0; transition: opacity 1s ease .8s;
+      max-width: 420px; text-align: center; line-height: 1.8;
+      backdrop-filter: blur(10px);
+    }
+    .birth-greet.reveal { opacity: 1; }
+
+    /* ---------- 感觉卡（性格+形象合一,所见即所得） ---------- */
+    .feel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .feel-card {
+      padding: 14px 14px; background: var(--card); border: 1px solid var(--line);
+      border-radius: 16px; cursor: pointer; transition: border-color .15s, background .15s;
+    }
+    .feel-card:hover { border-color: var(--pri-a60); }
+    .feel-card.sel { border-color: var(--violet); background: var(--pri-a14); }
+    .feel-card .f-emoji { font-size: 22px; }
+    .feel-card .f-label { font-weight: 700; font-size: 15px; margin-top: 5px; }
+    .feel-card .f-desc { font-size: 12.5px; color: var(--ink-soft-2); line-height: 1.6; margin-top: 3px; }
+    .feel-card .f-now { font-size: 11px; color: var(--violet); margin-top: 5px; min-height: 14px; }
+    .model-more { margin-top: 10px; font-size: 12.5px; color: var(--birth-ink-4); cursor: pointer; text-align: center; }
+    .model-more:hover { color: var(--ink-soft-3); }
+
+    /* ---------- 记住方式（隐私轻确认） ---------- */
+    .privacy-card { display: flex; flex-direction: column; gap: 14px; background: var(--card);
+      border: 1px solid var(--line); border-radius: 18px; padding: 20px 20px; }
+    .pv-row { display: flex; gap: 12px; align-items: flex-start; font-size: 12.5px; line-height: 1.8; color: var(--birth-ink-5); }
+    .pv-row b { color: var(--white); }
+    .pv-ic { font-size: 17px; flex: none; }
+
+    /* ---------- 完成层 ---------- */
+    .birth-done {
+      position: absolute; bottom: 9%; left: 50%; transform: translateX(-50%);
+      text-align: center; opacity: 0; pointer-events: none; transition: opacity 1s ease;
+    }
+    .birth-done.reveal { opacity: 1; pointer-events: auto; }
+    .birth-done .bd-title { font-size: 22px; letter-spacing: 4px; color: var(--on-glass-1); margin-bottom: 16px; text-shadow: 0 2px 14px var(--scrim-60); }
+
+    .footer-row { display: flex; gap: 14px; justify-content: center; margin-bottom: 3vh; }
+  </style>
+</head>
+<body>
+  <main>
+    <!-- 遇见（Live2D 实时渲染——TA 在欢迎页就会动、会看你；无光球兜底） -->
+    <section id="s-welcome" class="screen active">
+      <div class="welcome-canvas-wrap" id="welcome-canvas-wrap">
+        <div class="welcome-fallback" aria-hidden="true"></div>
+        <canvas id="welcome-l2d"></canvas>
+      </div>
+
+      <!-- 文案区：logo+字标一个 lockup、文案精简到一行、四样收进一块玻璃 -->
+      <div class="welcome-panel">
+        <div class="lockup">
+          <div class="mark">
+            <span class="glow" aria-hidden="true"></span>
+            <span class="ring" aria-hidden="true"></span>
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path class="star" d="M12 2.4 13.9 9.6 21.6 12 13.9 14.4 12 21.6 10.1 14.4 2.4 12 10.1 9.6Z"/>
+              <circle class="star-core" cx="12" cy="12" r="2.3" opacity=".5"/>
+              <defs><linearGradient id="lh-star" x1="4" y1="2" x2="21" y2="22" gradientUnits="userSpaceOnUse">
+                <stop class="s1"/><stop class="s2" offset="1"/>
+              </linearGradient></defs>
+            </svg>
+            <svg class="mini" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 3c.9 6 4.1 9.2 10 10-5.9.8-9.1 4-10 10-.9-6-4.1-9.2-10-10 5.9-.8 9.1-4 10-10Z" opacity=".9"/>
+            </svg>
+          </div>
+          <h1 data-i18n="birth.lockup.1">灵核</h1>
+        </div>
+        <!-- 文案走 i18n：拆两段是为了不把 .hl 高亮压平（data-i18n 只替 textContent） -->
+        <div class="lead"><span data-i18n="birth.welcome.lead">选一种感觉，起一个名字，</span><span class="hl" data-i18n="birth.welcome.leadHl">TA 就来了</span>。</div>
+        <div class="btn-row">
+          <button id="btn-restore-go" class="ghost" data-i18n="birth.btn-restore-go.1">接回 TA</button>
+          <button id="btn-reg-go" data-i18n="birth.btn-reg-go.1">让 TA 来见我</button>
+        </div>
+        <!-- 账号登录移出出生主流程：登录/注册本身**保留**
+             （灵核社交与 token 礼物将来要用），只是不再占主按钮位。 -->
+        <div class="switch welcome-switch" id="btn-login-go" data-i18n="birth.btn-login-go.1">已有灵核账号？用账号接回</div>
+      </div>
+    </section>
+
+    <!-- 接回 TA —— 用之前带走的包 + 密码，把 TA 接回来。
+         不走账号、不联网：包已整包加密，密码是唯一凭据（没有找回，UI 说白）。 -->
+    <section id="s-restore" class="screen">
+      <div class="sigil-wrap">
+        <!-- 一屏只有三样：圆 → 一句话 → 按钮。北极星与应用图标同源。 -->
+        <div class="sigil" id="sigil">
+          <div class="halo"></div>
+          <div class="arcB"></div>
+          <div class="arcA"></div>
+          <div class="rim"></div>
+          <div class="mark">
+            <svg width="108" height="108" viewBox="0 0 100 100" fill="none" aria-hidden="true">
+              <path d="M50 6c2.6 26 17.4 40.8 43.4 43.4C67.4 52 52.6 66.8 50 92.8 47.4 66.8 32.6 52 6.6 49.4 32.6 46.8 47.4 32 50 6Z" fill="var(--text)"/>
+              <path d="M79 12c.6 6 4 9.4 10 10-6 .6-9.4 4-10 10-.6-6-4-9.4-10-10 6-.6 9.4-4 10-10Z" fill="var(--dim)"/>
+            </svg>
+          </div>
+        </div>
+
+        <div class="sigil-lead" id="sigil-lead" data-i18n="birth.sigil-lead.2">导入<b data-i18n="birth.sigil-lead.1">记忆包</b>，她就回来了</div>
+
+        <div class="sigil-step" id="sigil-step1">
+          <button id="restore-pick" class="sigil-btn" data-i18n="birth.restore-pick.1">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5Z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/></svg>
+            导入记忆包
+          </button>
+        </div>
+
+        <div class="sigil-step sigil-step2" id="sigil-step2" hidden>
+          <div class="sigil-file" id="sigil-file"></div>
+          <input id="restore-pass" type="password" placeholder="包密码（6 位数字）" inputmode="numeric" autocomplete="off" / data-i18n-placeholder="birth.restore-pass.1">
+          <div class="err" id="restore-err"></div>
+          <button id="restore-submit" class="sigil-btn" data-i18n="birth.restore-submit.1">让她回来</button>
+          <div class="sigil-warn" data-i18n="birth.sigil-warn.1">这个密码没有找回。忘了它，这个包就打不开了。</div>
+        </div>
+
+        <div class="switch" id="restore-back" data-i18n="birth.restore-back.1">← 返回</div>
+      </div>
+    </section>
+
+    <!-- 登录 / 注册 -->
+    <section id="s-auth" class="screen">
+      <div class="card">
+        <h2 id="auth-title" data-i18n="birth.auth-title.1">登录</h2>
+        <input id="auth-email" type="email" placeholder="邮箱" autocomplete="email" / data-i18n-placeholder="birth.auth-email.1">
+        <input id="auth-pass" type="password" placeholder="密码（至少 6 位）" autocomplete="current-password" / data-i18n-placeholder="birth.auth-pass.1">
+        <input id="auth-pass2" type="password" placeholder="再输一次密码（注册时填写）" class="hidden" / data-i18n-placeholder="birth.auth-pass2.1">
+        <div class="err" id="auth-err"></div>
+        <button id="auth-submit" data-i18n="birth.auth-title.1">登录</button>
+        <div class="switch" id="auth-switch" data-i18n="birth.auth-switch.1">没有账号？去注册</div>
+        <!-- 离线测试假登录（免平台全链路） -->
+        <button class="mock-btn" id="auth-mock-btn" data-i18n="birth.auth-mock-btn.1">🧪 离线测试：一键假登录（不连平台）</button>
+        <!-- 打包版连别的平台服务器 —— 登录/注册/出生都走这里填的地址 -->
+        <div class="server-toggle" id="auth-server-toggle" data-i18n="birth.auth-server-toggle.1">🔧 平台服务器（换台电脑 / 连远程平台时填）</div>
+        <div class="server-row hidden" id="auth-server-row">
+          <input class="srv-input" id="auth-server" type="text" placeholder="http://192.168.x.x:8080 或 https://api.example.com" spellcheck="false" / data-i18n-placeholder="birth.auth-server.1">
+          <button class="srv-btn" id="auth-server-test" data-i18n="birth.auth-server-test.1">测试连接</button>
+        </div>
+        <div class="server-msg" id="auth-server-msg"></div>
+      </div>
+    </section>
+
+    <!-- 仪式向导（感觉 → 名字 → 记住方式 → 见面） -->
+    <section id="s-wizard" class="screen">
+      <div class="wizard-head">
+        <div class="wstep on" data-i="0" data-i18n="birth.wstep.1"><span class="dot">1</span>感觉</div>
+        <div class="wstep" data-i="1" data-i18n="birth.wstep.2"><span class="dot">2</span>名字</div>
+        <div class="wstep" data-i="2" data-i18n="birth.wstep.3"><span class="dot">3</span>方式</div>
+        <div class="wstep" data-i="3" data-i18n="birth.wstep.4"><span class="dot">4</span>见面</div>
+      </div>
+      <div class="wizard-body">
+        <div class="preview" id="preview">
+          <div class="p-orb hidden" id="l2d-orb"></div>
+          <canvas id="l2d"></canvas>
+          <div class="p-name" id="preview-name"></div>
+        </div>
+        <div class="panel">
+          <div class="step active" id="step-feel">
+            <!-- 语言（三处入口之三）——第一次见面就该能选，别等进了设置才找得到 -->
+            <div class="lang-row" id="lang-row">
+              <span class="lang-t" data-i18n="birth.lang.t">界面语言</span>
+              <span id="lang-pick"></span>
+            </div>
+            <h3 data-i18n="birth.step-feel.1">选一个感觉</h3>
+            <div class="tip" data-i18n="birth.tip.1">选一种你喜欢的相处感觉——TA 的样子和性子都会跟着变，所见即所得。</div>
+            <div class="feel-grid" id="feel-grid"></div>
+            <div class="model-more" id="model-more" data-i18n="birth.model-more.1">换换形象 ▾</div>
+            <div class="model-grid hidden" id="model-grid"></div>
+          </div>
+          <div class="step" id="step-name">
+            <h3 data-i18n="birth.step-name.1">你想怎么叫 TA</h3>
+            <div class="tip" data-i18n="birth.tip.2">名字是 TA 的身份，被占用的话会请你换一个。出生后，TA 会一辈子应这个名字。</div>
+            <input class="name-input" id="name-input" maxlength="16" placeholder="TA 的名字（1~16 个字）" / data-i18n-placeholder="birth.name-input.1">
+            <div class="name-count" id="name-count"></div>
+          </div>
+          <div class="step" id="step-privacy">
+            <h3 data-i18n="birth.step-privacy.1">我会记住你的方式</h3>
+            <div class="privacy-card">
+              <div class="pv-row"><span class="pv-ic">💭</span><div data-i18n="birth.pv-row.2"><b data-i18n="birth.pv-row.1">TA 会记住</b>你说的话、你们聊过的事——这是 TA 记住你的方式。</div></div>
+              <div class="pv-row"><span class="pv-ic">🔒</span><div data-i18n="birth.pv-row.4">这些都<b data-i18n="birth.pv-row.3">只存在这台电脑上</b>，不上传、不分享。</div></div>
+              <div class="pv-row"><span class="pv-ic">🕊</span><div data-i18n="birth.pv-row.5">你对 TA 说「忘掉这件事」，TA 就会真的放手。</div></div>
+            </div>
+            <div class="err" id="privacy-note"></div>
+          </div>
+          <div class="step" id="step-birth">
+            <h3 data-i18n="birth.step-birth.1">迎接 TA</h3>
+            <div class="confirm" id="birth-confirm"></div>
+            <button class="birth-btn" id="btn-birth" data-i18n="birth.btn-birth.1">✨ 让 TA 睁开眼睛</button>
+            <div class="waiting hidden" id="birth-waiting"></div>
+            <div class="err" id="birth-err"></div>
+          </div>
+        </div>
+      </div>
+      <div class="footer-row">
+        <button class="ghost" id="btn-back" data-i18n="birth.btn-back.1">上一步</button>
+        <button id="btn-next" data-i18n="birth.btn-next.1">下一步</button>
+      </div>
+    </section>
+
+    <!-- 出生亮相（光球 → 成型 → 睁眼 → 第一句话）→「好了,我记住你了」[进入我的家] -->
+    <section id="s-birth" class="screen">
+      <div class="birth-stage">
+        <div class="birth-orb" id="birth-orb"></div>
+        <div class="birth-canvas-wrap" id="birth-canvas-wrap"><canvas id="l2d-birth"></canvas></div>
+        <div class="birth-greet" id="birth-greet"></div>
+        <div class="birth-done" id="birth-done">
+          <div class="bd-title" data-i18n="birth.bd-title.1">好了，我记住你了。</div>
+          <button id="btn-enter-home" data-i18n="birth.btn-enter-home.1">进入我的家</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="./vendor/live2dcubismcore.min.js"></script>
+  <script src="./vendor/pixi.min.js"></script>
+  <script src="./vendor/pixi-live2d-display.min.js"></script>
+  <script src="./i18n.js"></script>
+  <script src="./components.js"></script>
+  <script src="./speech.js"></script>
+  <script src="./pet-live2d.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    /* 向导首屏的语言（三处入口之三）。
+       选完**不热切换**——这一步只是把偏好写下来，重启后生效（与设置页同一口径）。 */
+    (async () => {
+      const info = await window.api.i18nGet?.().catch(() => null);
+      const NAMES = { 'zh-CN': '简体中文', 'zh-Hant': '繁體中文', en: 'English', ja: '日本語', ko: '한국어' };
+      const slot = $('lang-pick');
+      if (!slot || !window.UI2?.LocalePicker) return;
+      slot.append(UI2.LocalePicker({
+        value: info?.pref ?? '',
+        supported: info?.supported ?? ['zh-CN', 'zh-Hant', 'en', 'ja', 'ko'],
+        onChange: async (v) => {
+          const r = await window.api.prefSet?.('language', v).catch(() => null);
+          if (r?.ok) UI2.Toast(v ? DT('birth.js.tpl.1', '选好了：{p1} —— 装好之后界面就是那个语言', { p1: NAMES[v] ?? v }) : '选好了：跟随系统语言', 'ok');
+        },
+      }));
+    })();
+    const screens = ['s-welcome', 's-restore', 's-auth', 's-wizard', 's-birth'];
+    const show = (id) => { screens.forEach((s) => $(s).classList.toggle('active', s === id)); };
+
+    // ---------- 状态 ----------
+    let token = '';
+    let authMode = 'login'; // login | register
+    let models = [];
+    let templates = [];
+    let sel = { feel: '', live2d_model_id: '', name: '', personality_template: '', voice: { voice_name: 'Cherry' } };
+    let stepIdx = 0;
+    let p2d = null;   // 向导预览渲染器
+    let p2dBirth = null;
+
+    // ---------- 账号屏 ----------
+    function setAuthMode(m) {
+      authMode = m;
+      $('auth-title').textContent = m === 'login' ? '登录' : '注册';
+      $('auth-pass2').classList.toggle('hidden', m !== 'register');
+      $('auth-switch').textContent = m === 'login' ? '没有账号？去注册' : '已有账号？去登录';
+      $('auth-submit').textContent = m === 'login' ? '登录' : '注册';
+      $('auth-err').textContent = '';
+    }
+    $('btn-login-go').onclick = () => { setAuthMode('login'); show('s-auth'); };
+    /* **出生包先在本地生成，不向平台申请、不绑定**。
+       所以「让 TA 来见我」直接进向导（跳过登录屏）；登录/注册本身**保留**（底下一行小字进得去，
+       将来社交与 token 礼物要用）。要走账号那条路（换设备接回同一个 TA），从登录屏进来。 */
+    let localBirthMode = true;      // true = 本地出生；false = 走平台账号
+    $('btn-reg-go').onclick = async () => { localBirthMode = true; await enterWizard(); };
+
+    // ---------- 接回 TA（包 + 密码，不走账号） ----------
+    let restorePath = '';
+    // 回到"还没选包"的样子：一句话恢复、光弧熄灭
+    function resetRestore() {
+      restorePath = '';
+      $('sigil-lead').innerHTML = '导入<b>记忆包</b>，她就回来了';
+      $('sigil-file').textContent = '';   // 漏了这个 → 下次进来还挂着上次的文件名
+      $('sigil-step1').hidden = false;
+      $('sigil-step2').hidden = true;
+      $('sigil').classList.remove('lit');
+      $('restore-pass').value = '';
+      $('restore-err').textContent = '';
+    }
+    $('btn-restore-go').onclick = () => { resetRestore(); show('s-restore'); };
+    $('restore-back').onclick = () => show('s-welcome');
+    $('restore-pick').onclick = async () => {
+      const r = await window.api.backupPick().catch(() => null);
+      if (!r?.ok) { if (r?.error && r.error !== '未选择文件') $('sigil-lead').textContent = r.error; return; }
+      restorePath = r.path;
+      // 选好包 → 光弧亮起（"她快回来了"的信号）；文件名单独一行，别挤进那句话里
+      $('sigil-lead').innerHTML = '就快好了，输一次密码';
+      $('sigil-file').textContent = r.path.split('/').pop();
+      $('sigil-step1').hidden = true;
+      $('sigil-step2').hidden = false;
+      $('sigil').classList.add('lit');
+      $('restore-err').textContent = '';
+      $('restore-pass').focus();
+    };
+    async function doRestore() {
+      if (!restorePath) { $('restore-err').textContent = '先选一个备份包'; return; }
+      const pass = $('restore-pass').value.trim();
+      if (pass.length < 6) { $('restore-err').textContent = '密码至少 6 位'; return; }
+      $('restore-err').textContent = '正在解开…';   // KDF 那一下约 1 秒，别让用户以为卡死
+      const r = await window.api.backupImport(restorePath, pass).catch(() => null);
+      if (!r?.ok) { $('restore-err').textContent = r?.error || '接回失败，请再试一次'; return; }
+      // 名字与形象都在出生包的 selections 里（status() 的 portrait 是形象图，不是名字）。
+      // ⚠ 接回这条路**不走向导**，所以 playBirth 依赖的 sel 得在这儿补齐 —— 否则亮相层
+      //   找不到该加载哪个模型，只会出现光球（等于"她回来了但没脸"）。
+      const prof = await window.api.petProfile().catch(() => null);
+      const s = prof?.selections ?? {};
+      sel = { ...sel, ...s, voice: { ...sel.voice, ...(s.voice ?? {}) } };
+      const nm = s.name || 'TA';
+      $('restore-err').textContent = '';
+      playBirth(nm, '我回来啦。');
+    }
+    $('restore-submit').onclick = doRestore;
+    $('restore-pass').addEventListener('keydown', (e) => { if (e.key === 'Enter') doRestore(); });
+    $('auth-switch').onclick = () => setAuthMode(authMode === 'login' ? 'register' : 'login');
+
+    // ---------- 平台服务器（打包版异地登录修复） ----------
+    // 展示当前地址（去掉 ?r= 尾，让用户填裸根/完整都行）
+    const prettyBase = (b) => String(b ?? '').replace(/\/index\.php\?r=$/, '').replace(/\?r=$/, '');
+    let serverTouched = false;
+    (async () => {
+      try {
+        const info = await window.api.birthPlatformGet();
+        if (info?.base) {
+          $('auth-server').value = prettyBase(info.base);
+          $('auth-server').placeholder = '当前：' + prettyBase(info.base);
+        }
+      } catch { /* 忽略 */ }
+    })();
+    $('auth-server-toggle').onclick = () => {
+      const row = $('auth-server-row');
+      row.classList.toggle('hidden');
+      if (!row.classList.contains('hidden')) { $('auth-server').focus(); serverTouched = true; }
+    };
+    $('auth-server').addEventListener('input', () => { serverTouched = true; });
+    // 测试连接：填的地址存下来（不落盘直接试），成功/失败明说
+    $('auth-server-test').onclick = async () => {
+      const v = $('auth-server').value.trim();
+      const msg = $('auth-server-msg');
+      if (!v) { msg.textContent = '请先填平台地址'; msg.className = 'server-msg bad'; return; }
+      msg.textContent = '测试中…'; msg.className = 'server-msg';
+      $('auth-server-test').disabled = true;
+      const r = await window.api.birthPlatformTest(v);
+      $('auth-server-test').disabled = false;
+      msg.textContent = r.ok ? '✅ ' + r.note : '❌ ' + (r.error ?? '测试失败');
+      msg.className = 'server-msg ' + (r.ok ? 'ok' : 'bad');
+      if (r.ok) {
+        const saved = await window.api.birthPlatformSet(v);
+        if (saved.ok) msg.textContent = '✅ 已应用：' + prettyBase(saved.base) + '（现在去登录）';
+      }
+    };
+    // 登录/注册前：若填过服务器地址则先应用（空输入 = 不覆盖，用默认/环境变量）
+    async function applyServerIfAny() {
+      const v = $('auth-server').value.trim();
+      if (!serverTouched || !v) return null;
+      const r = await window.api.birthPlatformSet(v);
+      return r.ok ? r : { error: r?.error ?? '平台地址保存失败' };
+    }
+
+    // ---------- 离线测试假登录（免平台，全链路本地出生） ----------
+    let mockActive = false;
+    const MOCK_EMAIL = 'mock@local';
+    function renderMockUI() {
+      const btn = $('auth-mock-btn');
+      const title = $('auth-title');
+      if (mockActive) {
+        btn.textContent = '⚡ 假登录已开启（点一下直接进出生向导）';
+        btn.style.borderColor = 'var(--ok-a80)';
+        btn.style.background = 'var(--ok-a22)';
+        $('auth-email').placeholder = '测试模式：邮箱随意';
+        $('auth-pass').placeholder = '测试模式：密码随意（≥6 位）';
+        if (title.textContent === '登录') title.textContent = '登录 · 离线测试';
+      } else {
+        btn.textContent = '🧪 离线测试：一键假登录（不连平台）';
+        $('auth-email').placeholder = '邮箱';
+        $('auth-pass').placeholder = '密码（至少 6 位）';
+      }
+    }
+    $('auth-mock-btn').onclick = async () => {
+      const r = await window.api.birthMockMode(true);
+      if (!r?.ok) { $('auth-err').textContent = '开启失败：' + (r?.error ?? ''); return; }
+      mockActive = true; renderMockUI();
+      $('auth-email').value = MOCK_EMAIL;
+      $('auth-pass').value = 'test123456';
+      $('auth-submit').disabled = true;
+      // mock 后端放行任意凭证 → 直接进入出生向导（me 返回无已申请 → enterWizard）
+      const lg = await window.api.birthLogin(MOCK_EMAIL, 'test123456');
+      $('auth-submit').disabled = false;
+      if (lg.ok) { token = lg.token; await afterAuth(); }
+      else $('auth-err').textContent = '假登录失败：' + (lg.error ?? '');
+    };
+    // 启动时同步后端 mock 状态（auth.json.mock / 环境变量持久激活）
+    (async () => {
+      try { const s = await window.api.birthMockStatus(); if (s?.mock) { mockActive = true; renderMockUI(); } } catch { /* 忽略 */ }
+    })();
+
+    $('auth-submit').onclick = async () => {
+      const email = $('auth-email').value.trim();
+      const pass = $('auth-pass').value;
+      const pass2 = $('auth-pass2').value;
+      $('auth-err').textContent = '';
+      if (!email || pass.length < 6) { $('auth-err').textContent = '请填写邮箱和至少 6 位密码'; return; }
+      if (authMode === 'register' && pass !== pass2) { $('auth-err').textContent = '两次密码不一致'; return; }
+      $('auth-submit').disabled = true;
+      // 先应用用户填的平台地址（换服务器登录），失败即止
+      const srv = await applyServerIfAny();
+      if (srv?.error) { $('auth-err').textContent = srv.error; $('auth-submit').disabled = false; return; }
+      const r = authMode === 'login' ? await window.api.birthLogin(email, pass) : await window.api.birthRegister(email, pass);
+      $('auth-submit').disabled = false;
+      if (!r.ok) { $('auth-err').textContent = r.error; return; }
+      token = r.token;
+      await afterAuth();
+    };
+
+    async function afterAuth() {
+      const me = await window.api.birthMe(token);
+      if (!me.ok) { $('auth-err').textContent = me.error; return; }
+      const app = me.application;
+      if (app && app.ready) {
+        // 换设备：直接接回同一个 TA
+        $('auth-err').textContent = '';
+        await reclaim(app);
+      } else if (app) {
+        $('auth-err').textContent = '你的 TA「' + (app.name || '') + '」还没出生完成（' + (app.status || '') + '），请稍后重试登录。';
+      } else {
+        localBirthMode = false;   // 账号那条路：模板/申请都走平台
+        await enterWizard();
+      }
+    }
+
+    async function reclaim(app) {
+      const r = await window.api.birthBind(token, app.id);
+      if (!r.ok) { $('auth-err').textContent = '接回失败：' + r.error; return; }
+      playBirth(r.name, '我回来啦。');
+    }
+
+    // ---------- 向导（仪式流：感觉 → 名字 → 记住方式 → 见面） ----------
+    async function enterWizard() {
+      show('s-wizard');
+      stepIdx = 0;
+      // 本地出生用内置性格卡（不联网）；走账号那条路才问平台要模板
+      const [lm, tp] = await Promise.all([
+        window.api.live2dModels(),
+        localBirthMode ? window.api.birthLocalTemplates() : window.api.birthTemplates(),
+      ]);
+      models = lm.ok ? lm.models : models;
+      templates = tp.ok ? tp.templates : [];
+      if (!models.length) { $('model-grid').innerHTML = '<div class="err">形象库加载失败（本地模型缺失）</div>'; }
+      renderModels();
+      renderFeels();
+      // 默认感觉：温柔（或首个可用感觉）
+      if (!sel.feel) applyFeel(FEELS.find((f) => models.some((m) => m.id === f.model))?.key ?? FEELS[0].key, { silent: true });
+      initPreview();
+      refreshSteps();
+    }
+
+    // 感觉卡:感觉 → (形象模型 + 性格模板匹配词)。模板 label 按关键词模糊匹配(mock/平台下发都兼容),兜底第一张。
+    const FEELS = [
+      { key: 'gentle', emoji: '🌙', label: '温柔', desc: '轻声细语，把你的情绪接住', model: 'Natori', tplWords: ['温柔', '治愈'] },
+      { key: 'smart', emoji: '✨', label: '聪明', desc: '陪你琢磨任何问题，一起想', model: 'Mao', tplWords: ['好奇', '缪斯', '聪明'] },
+      { key: 'lively', emoji: '☀️', label: '活泼', desc: '元气满满，总能把你拉出坏心情', model: 'Haru', tplWords: ['阳光', '搭子', '活泼'] },
+      { key: 'quiet', emoji: '🌲', label: '安静', desc: '话不多，但一直在', model: 'Hiyori', tplWords: ['沉稳', '守护', '安静'] },
+    ];
+    function templateForFeel(feel) {
+      return templates.find((t) => feel.tplWords.some((w) => String(t.label ?? '').includes(w)))
+        ?? templates.find((t) => feel.tplWords.some((w) => String(t.persona ?? '').includes(w)))
+        ?? templates[0]
+        ?? null;
+    }
+    function applyFeel(key, { silent = false } = {}) {
+      const feel = FEELS.find((f) => f.key === key);
+      if (!feel) return;
+      sel.feel = key;
+      if (models.some((m) => m.id === feel.model)) sel.live2d_model_id = feel.model;
+      const t = templateForFeel(feel);
+      if (t) sel.personality_template = t.id;
+      renderFeels();
+      renderModels();
+      const m = models.find((x) => x.id === sel.live2d_model_id);
+      if (p2d && m) p2d.loadModel('l2d://local/' + m.file, () => {});
+      $('preview-name').textContent = m?.label || sel.live2d_model_id || '';
+      if (!silent) window.api.birthSpeak(t?.sample_line ?? '', 'neutral'); // 所选即所得:听 TA 用这个感觉说话
+    }
+    function renderFeels() {
+      const g = $('feel-grid');
+      g.innerHTML = '';
+      for (const f of FEELS) {
+        const available = models.some((m) => m.id === f.model);
+        if (!available) continue;
+        const el = document.createElement('div');
+        el.className = 'feel-card' + (sel.feel === f.key ? ' sel' : '');
+        el.innerHTML =
+          `<div class="f-emoji">${f.emoji}</div>
+           <div class="f-label">${f.label}</div>
+           <div class="f-desc">${f.desc}</div>
+           <div class="f-now">${sel.feel === f.key ? '就是这种感觉 ✓' : ''}</div>`;
+        el.onclick = () => applyFeel(f.key);
+        g.appendChild(el);
+      }
+    }
+
+    const MODEL_META = {
+      Hiyori: ['蓝发', '元气', '眼神跟随'],
+      Mao: ['虹色双马尾', '8 组表情', '物理'],
+      Haru: ['粉发双马尾', '10 组动作', '表情库'],
+      Natori: ['白毛', '文静', '10 组动作'],
+      Wanko: ['犬系吉祥物', '软萌', '表情库'],
+    };
+    function renderModels() {
+      const g = $('model-grid');
+      if (!g) return;
+      g.innerHTML = '';
+      for (const m of models) {
+        const el = document.createElement('div');
+        el.className = 'model-card' + (m.id === sel.live2d_model_id ? ' sel' : '');
+        el.innerHTML =
+          `<div class="m-avatar">${(m.label || m.id).slice(0, 1)}</div>
+           <div><div class="m-name">${escapeHtml(m.label || m.id)}</div>
+           <div class="m-feat">${(MODEL_META[m.id] || []).join(' · ')}</div></div>
+           <div class="m-check">${m.id === sel.live2d_model_id ? '✓' : ''}</div>`;
+        el.onclick = () => {
+          sel.live2d_model_id = m.id;
+          const feel = FEELS.find((f) => f.model === m.id);
+          if (feel) sel.feel = feel.key; // 换形象 = 感觉跟着换(合一卡语义),罕见模型(如 Wanko)只改形象
+          renderFeels();
+          renderModels();
+          p2d?.loadModel('l2d://local/' + m.file, () => {});
+          $('preview-name').textContent = m.label || m.id;
+        };
+        g.appendChild(el);
+      }
+    }
+    $('model-more').onclick = () => {
+      const g = $('model-grid');
+      g.classList.toggle('hidden');
+      $('model-more').textContent = g.classList.contains('hidden') ? '换换形象 ▾' : '收起形象列表 ▴';
+    };
+
+    function initPreview() {
+      const canvas = $('l2d');
+      const rect = canvas.parentElement.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.round(rect.width * dpr);
+      canvas.height = Math.round(rect.height * dpr);
+      p2d = window.PETL2D.create(canvas);
+      p2d.resize(canvas.width, canvas.height);
+      if (sel.live2d_model_id) {
+        const m = models.find((x) => x.id === sel.live2d_model_id);
+        if (m) {
+          p2d.loadModel('l2d://local/' + m.file, (ok) => {
+            if (ok) $('l2d-orb').classList.add('hidden');
+          });
+          $('preview-name').textContent = m.label || m.id;
+        }
+      }
+    }
+
+    // ---------- 步骤切换 ----------
+    const STEP_IDS = ['step-feel', 'step-name', 'step-privacy', 'step-birth'];
+    function refreshSteps() {
+      document.querySelectorAll('.wstep').forEach((el, i) => {
+        el.classList.toggle('on', i === stepIdx);
+        el.classList.toggle('done', i < stepIdx);
+      });
+      STEP_IDS.forEach((id, i) => {
+        $(id).classList.toggle('active', i === stepIdx);
+      });
+      $('btn-back').disabled = stepIdx === 0;
+      $('btn-next').textContent = stepIdx === 3 ? '就绪' : '下一步';
+      $('btn-next').disabled = !stepOk();
+      if (stepIdx === 3) renderConfirm();
+    }
+    function stepOk() {
+      if (stepIdx === 0) return !!sel.live2d_model_id && !!sel.personality_template;
+      if (stepIdx === 1) return sel.name.trim().length >= 1;
+      return true; // 方式步/见面步无需输入
+    }
+    $('name-input').oninput = () => {
+      sel.name = $('name-input').value.trim();
+      $('name-count').textContent = sel.name.length + ' / 16';
+      refreshSteps();
+    };
+    $('btn-next').onclick = () => { if (stepIdx < 3 && stepOk()) { stepIdx++; refreshSteps(); } };
+    $('btn-back').onclick = () => { if (stepIdx > 0) { stepIdx--; refreshSteps(); } };
+
+    function renderConfirm() {
+      const m = models.find((x) => x.id === sel.live2d_model_id);
+      const t = templates.find((x) => x.id === sel.personality_template);
+      const feel = FEELS.find((f) => f.key === sel.feel);
+      $('birth-confirm').innerHTML =
+        `TA 的感觉：<b>${feel ? `${feel.emoji} ${feel.label}` : '—'}</b><br/>
+         TA 的样子：<b>${escapeHtml(m ? m.label : sel.live2d_model_id)}</b><br/>
+         名字：<b>${escapeHtml(sel.name)}</b>（你一喊，TA 就应）<br/>
+         性子：<b>${escapeHtml(t ? t.label : '')}</b> — ${escapeHtml(t ? t.persona : '')}`;
+    }
+
+    // ---------- 出生（工程过程全隐藏,失败人话;细节只进 diag.log） ----------
+    function birthFail(msg, backToName) {
+      $('btn-birth').disabled = false;
+      $('birth-waiting').classList.add('hidden');
+      $('birth-err').textContent = msg;
+      if (backToName) { stepIdx = 1; refreshSteps(); }
+    }
+    $('btn-birth').onclick = async () => {
+      $('btn-birth').disabled = true;
+      $('birth-err').textContent = '';
+      const w = $('birth-waiting');
+      w.classList.remove('hidden');
+      w.textContent = '正在告诉平台：你的 TA 要来了…';
+      // 本地出生：一步到位（本地生成包 + 绑定），不向平台申请
+      if (localBirthMode) {
+        w.textContent = 'TA 正在成形，人格正在长好…';
+        const lr = await window.api.birthLocal(sel);
+        if (!lr?.ok) { birthFail(DT('birth.js.tpl.2', '迎接 TA 的时候出了点岔子：{p1}。再试一次？', { p1: lr?.error ?? '' })); return; }
+        playBirth(lr.name, lr.greeting || ('你好，我是' + lr.name + '。从今天起，我住在这里啦。'));
+        return;
+      }
+      const r = await window.api.birthApply(token, sel);
+      if (!r.ok) {
+        const e = String(r.error || '');
+        birthFail(e.includes('名字') ? DT('birth.js.tpl.3', '「{p1}」已经被别的 TA 用了,换一个名字试试。', { p1: sel.name }) : DT('birth.js.tpl.4', '这一步没走通:{p1}', { p1: e }), e.includes('名字'));
+        return;
+      }
+      w.textContent = 'TA 正在成形，人格正在长好…';
+      const wr = await window.api.birthWaitReady(token, r.id);
+      if (!wr.ok) {
+        birthFail(DT('birth.js.tpl.5', 'TA 还没准备好:{p1}。稍等一下再试,或者回去看看别的选择。', { p1: wr.error }));
+        return;
+      }
+      w.textContent = '好了,TA 正在往你的电脑里搬…';
+      const br = await window.api.birthBind(token, r.id);
+      if (!br.ok) {
+        birthFail(DT('birth.js.tpl.6', '迎接 TA 的时候出了点岔子:{p1}', { p1: br.error }));
+        return;
+      }
+      playBirth(br.name, br.greeting || ('你好，我是' + br.name + '。从今天起，我住在这里啦。'));
+    };
+
+    // ---------- 出生亮相：光球 → 成型 → 睁眼 → 第一句话 →「好了,我记住你了」[进入我的家] ----------
+    async function playBirth(name, greeting) {
+      show('s-birth');
+      const wrap = $('birth-canvas-wrap');
+      // 复用向导渲染器：canvas 直接移动过来（不重建 WebGL context，避免双实例 shader 冲突）
+      const canvas = $('l2d');
+      wrap.appendChild(canvas);
+      const rect = wrap.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.round(rect.width * dpr);
+      canvas.height = Math.round(rect.height * dpr);
+      // 这条路径认为"向导屏已经建过渲染器"（下面注释说的复用），
+      // 但「接回 TA」是**不走向导**直接到这里的 → p2d 还是 null → p2d.resize 抛
+      // Uncaught (in promise)。所以这里补一句兜底：没有就现建一个。
+      if (!p2d) p2d = window.PETL2D.create(canvas);
+      p2d.resize(canvas.width, canvas.height);
+      const m = models.find((x) => x.id === sel.live2d_model_id);
+      if (m) {
+        await new Promise((res) => p2d.loadModel('l2d://local/' + m.file, () => res()));
+      }
+      // 光球蓄能 2.2s → 成型淡入（光球隐去）→ 睁眼（待机）→ 第一句话 → 完成层
+      await new Promise((r) => setTimeout(r, 2200));
+      $('birth-orb').style.opacity = '0';
+      $('birth-orb').style.transition = 'opacity .8s ease';
+      wrap.classList.add('reveal');
+      await new Promise((r) => setTimeout(r, 1200));
+      $('birth-greet').textContent = greeting;
+      $('birth-greet').classList.add('reveal');
+      window.api.birthSpeak(greeting, 'joy');
+      await new Promise((r) => setTimeout(r, 3500));
+      $('birth-done').classList.add('reveal'); // 用户亲手按「进入我的家」,掌控感收尾
+    }
+    $('btn-enter-home').onclick = () => window.api.birthDone();
+
+    function escapeHtml(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+    // ---------- 欢迎屏 Live2D（页面加载即渲染当前形象——TA 在欢迎页就会动、会看你） ----------
+    let welcomeP2d = null;
+    (async function initWelcome() {
+      try {
+        console.log('[welcome] 0 start, PETL2D=' + typeof window.PETL2D); window.api.birthDiag?.('[welcome] 0 start PETL2D=' + typeof window.PETL2D);
+        const lm = await window.api.live2dModels();
+        models = lm.ok ? lm.models : [];
+        console.log('[welcome] 1 lm ok=' + lm.ok + ' n=' + models.length + ' active=' + lm.active); window.api.birthDiag?.('[welcome] 1 lm ok=' + lm.ok + ' n=' + models.length + ' active=' + lm.active);
+        const active = lm.active || (models[0] && models[0].id) || '';
+        const m = models.find((x) => x.id === active) || models[0];
+        console.log('[welcome] 2 model=' + (m ? m.id + ' file=' + m.file : 'NONE')); window.api.birthDiag?.('[welcome] 2 model=' + (m ? m.id + ' file=' + m.file : 'NONE'));
+        if (!m || !window.PETL2D) return;
+        const canvas = $('welcome-l2d');
+        const wrap = $('welcome-canvas-wrap');
+        const rect = wrap.getBoundingClientRect();
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.round(rect.width * dpr);
+        canvas.height = Math.round(rect.height * dpr);
+        console.log('[welcome] 3 rect=' + Math.round(rect.width) + 'x' + Math.round(rect.height) + ' canvas=' + canvas.width + 'x' + canvas.height); window.api.birthDiag?.('[welcome] 3 rect=' + Math.round(rect.width) + 'x' + Math.round(rect.height) + ' canvas=' + canvas.width + 'x' + canvas.height);
+        welcomeP2d = window.PETL2D.create(canvas);
+        welcomeP2d.resize(canvas.width, canvas.height);
+        welcomeP2d.loadModel('l2d://local/' + m.file, (ok) => {
+          console.log('[welcome] 4 loadModel ok=' + ok + ' err=' + (window.__l2dErr ?? '-'));
+          window.api.birthDiag?.('[welcome] 4 loadModel ok=' + ok + ' err=' + (window.__l2dErr ?? '-'));
+        });
+      } catch (e) { console.log('[welcome] ERR ' + (e?.message ?? e)); window.api.birthDiag?.('[welcome] ERR ' + (e?.message ?? e)); }
+    })();
+
+    // 本机播报：云音色不可用时主进程会把本机播报推过来 —— 挑中文女声出声。
+    // 出生仪式里"听 TA 用这个感觉说话"就是这条链路。
+    window.api.onPetSpeechLocal?.(({ text, voice } = {}) => {
+      if (!text || !window.LH_SPEECH) return;
+      Promise.resolve(window.LH_SPEECH.speakLocal(text, voice)).then((r) => {
+        window.api.birthDiag?.(`[birth] speakLocal voice=${r?.voice || '(默认)'} fallback=${r?.fallback === true} voices=${r?.voices ?? '?'}`);
+      });
+    });
+
+    window.addEventListener('resize', () => {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      // 欢迎屏：窗口缩放 → 画布重设 + Live2D 重适配（否则 canvas CSS 拉伸比例失衡 → 形态变形）
+      if (welcomeP2d) {
+        const wc = $('welcome-l2d'); const wr = wc.parentElement.getBoundingClientRect();
+        wc.width = Math.round(wr.width * dpr);
+        wc.height = Math.round(wr.height * dpr);
+        welcomeP2d.resize(wc.width, wc.height);
+      }
+      // 向导屏
+      if (!p2d) return;
+      const c = $('l2d'); const r = c.parentElement.getBoundingClientRect();
+      c.width = Math.round(r.width * dpr);
+      c.height = Math.round(r.height * dpr);
+      p2d.resize(c.width, c.height);
+    });
+  </script>
+</body>
+</html>
