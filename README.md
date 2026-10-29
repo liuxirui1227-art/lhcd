@@ -227,11 +227,15 @@ node scripts/build-dist.mjs --all     # 两者都要
 | [`brain/README.md`](./brain/README.md) | 智能体大脑：构建、测试与架构红线 |
 | [`eval/README.md`](./eval/README.md) | 评测 harness：人格探针集与评测基线 |
 | [`spec/README.md`](./spec/README.md) | 出生包 canonical 契约（字节级规则） |
-| [`LICENSE`](./LICENSE) | Apache License 2.0 |
+| [`LICENSE`](./LICENSE) | PolyForm Noncommercial License 1.0.0 |
 
 ## 许可证
 
-[Apache License 2.0](./LICENSE) · Copyright 2026 刘庆威 (Liu Qingwei)
+[PolyForm Noncommercial License 1.0.0](./LICENSE) · Copyright 2026 刘庆威 (Liu Qingwei)
+
+**仅限非商业使用。** 你可以基于本仓库源码学习、修改，并用于个人或非商业目的；任何商业用途（包括但不限于打包出售、付费服务、商业产品集成）都必须另行取得版权持有人的书面授权。
+
+> 说明：v1.0.0 及更早发布的版本采用 Apache License 2.0；自本次变更后的版本起改用 PolyForm Noncommercial License 1.0.0。已按 Apache-2.0 取得旧版本副本的第三方，其依据该许可取得的权利不受影响。
 
 ---
 
@@ -456,8 +460,12 @@ The philosophy in one line: **walls can't be torn down; doors only decide whethe
 | [`brain/README.md`](./brain/README.md) | The agent brain: build, test, architecture red lines |
 | [`eval/README.md`](./eval/README.md) | Evaluation harness: persona probes and baselines |
 | [`spec/README.md`](./spec/README.md) | Birth-package canonical contract (byte-level rules) |
-| [`LICENSE`](./LICENSE) | Apache License 2.0 |
+| [`LICENSE`](./LICENSE) | PolyForm Noncommercial License 1.0.0 |
 
 ## License
 
-[Apache License 2.0](./LICENSE) · Copyright 2026 刘庆威 (Liu Qingwei)
+[PolyForm Noncommercial License 1.0.0](./LICENSE) · Copyright 2026 刘庆威 (Liu Qingwei)
+
+**Noncommercial use only.** You may study, modify, and use this source code for personal or other noncommercial purposes. Any commercial use — including but not limited to selling packaged builds, offering paid services, or integrating it into a commercial product — requires prior written permission from the copyright holder.
+
+> Note: v1.0.0 and earlier releases were published under the Apache License 2.0. Starting with the version following this change, the project is licensed under PolyForm Noncommercial License 1.0.0. Third parties who obtained copies of earlier versions under Apache-2.0 retain the rights granted by that license.
